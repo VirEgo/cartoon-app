@@ -65,7 +65,7 @@ async function fetchRandomCartoon(age = 5, seenIds = [], dislikedIds = []) {
 
 function generateButtons(user, cartoon) {
 	const alreadyLiked = user.likedCartoonIds?.includes(cartoon.id);
-
+	const alreadyInFav = user.favoriteCartoonIds?.includes(cartoon.id);
 	return {
 		inline_keyboard: [
 			[
@@ -79,7 +79,15 @@ function generateButtons(user, cartoon) {
 						disabled: true,
 					}),
 				},
-				{ text: '👎 Не нравится', callback_data: `dislike_${cartoon.id}` },
+				{
+					text: '👎 Не нравится',
+					callback_data: `dislike_${cartoon.id}`,
+					...(alreadyInFav && {
+						callback_data: 'already_liked',
+						text: '👎 Уже не нравится',
+						disabled: true,
+					}),
+				},
 			],
 			[{ text: '⭐ В избранное', callback_data: `fav_${cartoon.id}` }],
 		],
@@ -354,7 +362,7 @@ bot.on('text', async (ctx) => {
 				? `https://image.tmdb.org/t/p/w500${cartoon.poster_path}`
 				: null;
 
-			const caption = `<b>${cartoon.title}</b>\n\n Рейтинг: <b>${cartoon.vote_average}</b>`;
+			const caption = `<b>${cartoon.title}</b>\n\n Рейтинг: <b>${cartoon.vote_average}</b>\n\n ${cartoon.overview}\n\n <a href="https://www.themoviedb.org/movie/${cartoon.id}">TMDB</a>\n\n Страна: <b>${cartoon.original_language}</b>\n\n Год: <b>${cartoon.release_date}`;
 
 			if (photoUrl) {
 				await ctx.replyWithPhoto(photoUrl, {
