@@ -340,9 +340,6 @@ bot.on('text', async (ctx) => {
 					},
 				);
 			}
-			// увеличиваем счётчик
-			user.requestCount++;
-			await user.save();
 		}
 
 		const age = Math.min(user.age + 2, 8);
@@ -388,6 +385,9 @@ bot.on('text', async (ctx) => {
 					reply_markup: generateButtons(user, cartoon),
 				});
 			}
+			// увеличиваем счётчик
+			user.requestCount++;
+			await user.save();
 		} catch (err) {
 			console.error('❌ Общая ошибка:', err);
 			await ctx.reply('Ошибка при получении мультфильмов.');
