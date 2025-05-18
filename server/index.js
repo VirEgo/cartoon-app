@@ -79,17 +79,18 @@ function generateButtons(user, cartoon) {
 						disabled: true,
 					}),
 				},
+			],
+			[
 				{
-					text: '👎 Не нравится',
-					callback_data: `dislike_${cartoon.id}`,
+					text: '⭐ В избранное',
+					callback_data: `fav_${cartoon.id}`,
 					...(alreadyInFav && {
-						callback_data: 'already_liked',
-						text: '👎 Уже не нравится',
+						callback_data: `nofav_${cartoon.id}`,
+						text: '⭐ Уже не в избранном',
 						disabled: true,
 					}),
 				},
 			],
-			[{ text: '⭐ В избранное', callback_data: `fav_${cartoon.id}` }],
 		],
 	};
 }
@@ -517,6 +518,16 @@ bot.on('callback_query', async (ctx) => {
 			return ctx.answerCbQuery('⭐ Добавлено в избранное!');
 		} else {
 			return ctx.answerCbQuery('Уже в избранном!');
+		}
+	}
+	if (data === 'nofav_') {
+		const id = parseInt(data.split('_')[1]);
+		if (user.favoriteCartoonIds.includes(id)) {
+			user.favoriteCartoonIds = user.favoriteCartoonIds.filter((i) => i !== id);
+			await user.save();
+			return ctx.answerCbQuery('⭐ Убрано из избранного!');
+		} else {
+			return ctx.answerCbQuery('Не в избранном!');
 		}
 	}
 
