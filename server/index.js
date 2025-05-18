@@ -363,12 +363,7 @@ bot.on('text', async (ctx) => {
 				? `https://image.tmdb.org/t/p/w500${cartoon.poster_path}`
 				: null;
 
-			const caption = `
-			<b>${cartoon.title}</b>\n\n 
-			Рейтинг: <b>${cartoon.vote_average}</b>\n\n 
-			${cartoon.overview}\n\n
-			 <a href="https://www.themoviedb.org/movie/${cartoon.id}">TMDB</a>\n\n 
-			 Страна: <b>${cartoon.original_language}</b>\n\n Год: <b>${cartoon.release_date}</b>\n\n`;
+			const caption = `<b>${cartoon.title}</b>\nРейтинг: <b>${cartoon.vote_average}</b>\n${cartoon.overview}\n`;
 
 			if (photoUrl) {
 				await ctx.replyWithPhoto(photoUrl, {
