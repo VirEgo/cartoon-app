@@ -79,16 +79,21 @@ function generateButtons(user, cartoon) {
 						disabled: true,
 					}),
 				},
+				{
+					text: '👎 Не нравится',
+					callback_data: `dislike_${cartoon.id}`,
+					// отключим, если уже дизлайк
+					...(user.dislikedCartoonIds?.includes(cartoon.id) && {
+						callback_data: 'already_disliked',
+						text: '👎 Уже не нравится',
+						disabled: true,
+					}),
+				},
 			],
 			[
 				{
-					text: '⭐ В избранное',
-					callback_data: `fav_${cartoon.id}`,
-					...(alreadyInFav && {
-						callback_data: `nofav_${cartoon.id}`,
-						text: '⭐ Уже не в избранном',
-						disabled: true,
-					}),
+					text: alreadyInFav ? '⭐ Убрать из избранного' : '⭐ В избранное',
+					callback_data: `togglefav_${cartoon.id}`,
 				},
 			],
 		],
@@ -357,20 +362,26 @@ bot.on('text', async (ctx) => {
 				await user.updateOne({ seenCartoonIds: seen });
 			}
 
-			await user.updateOne({ seenCartoonIds: seen });
-			// Проверка на наличие постера
 			const photoUrl = cartoon.poster_path
 				? `https://image.tmdb.org/t/p/w500${cartoon.poster_path}`
 				: null;
 
-			const caption = `<b>${cartoon.title}</b>\nРейтинг: <b>${cartoon.vote_average}</b>\n${cartoon.overview}\n`;
+			const caption = `<b>${cartoon.title}</b>\nРейтинг: <i>${cartoon.vote_average}</i>\n${cartoon.overview}`;
 
 			if (photoUrl) {
-				await ctx.replyWithPhoto(photoUrl, {
-					caption,
-					parse_mode: 'HTML',
-					reply_markup: generateButtons(user, cartoon),
-				});
+				try {
+					await ctx.replyWithPhoto(photoUrl, {
+						caption,
+						parse_mode: 'HTML',
+						reply_markup: generateButtons(user, cartoon),
+					});
+				} catch (e) {
+					console.error('❌ Ошибка при отправке фото:', e.message);
+					await ctx.reply(caption, {
+						parse_mode: 'HTML',
+						reply_markup: generateButtons(user, cartoon),
+					});
+				}
 			} else {
 				await ctx.reply(caption, {
 					parse_mode: 'HTML',
@@ -378,8 +389,8 @@ bot.on('text', async (ctx) => {
 				});
 			}
 		} catch (err) {
-			console.error(err);
-			ctx.reply('Ошибка при получении мультфильмов.');
+			console.error('❌ Общая ошибка:', err);
+			await ctx.reply('Ошибка при получении мультфильмов.');
 		}
 
 		return;
@@ -505,25 +516,21 @@ bot.on('callback_query', async (ctx) => {
 		}
 	}
 
-	if (data.startsWith('fav_')) {
+	if (data.startsWith('togglefav_')) {
 		const id = parseInt(data.split('_')[1]);
-		if (!user.favoriteCartoonIds.includes(id)) {
-			user.favoriteCartoonIds.push(id);
-			await user.save();
-			return ctx.answerCbQuery('⭐ Добавлено в избранное!');
-		} else {
-			return ctx.answerCbQuery('Уже в избранном!');
-		}
-	}
-	if (data === 'nofav_') {
-		const id = parseInt(data.split('_')[1]);
-		if (user.favoriteCartoonIds.includes(id)) {
+		if (!user.favoriteCartoonIds) user.favoriteCartoonIds = [];
+		const alreadyFav = user.favoriteCartoonIds.includes(id);
+
+		if (alreadyFav) {
 			user.favoriteCartoonIds = user.favoriteCartoonIds.filter((i) => i !== id);
-			await user.save();
-			return ctx.answerCbQuery('⭐ Убрано из избранного!');
+			await ctx.answerCbQuery('⭐ Убрано из избранного!');
 		} else {
-			return ctx.answerCbQuery('Не в избранном!');
+			user.favoriteCartoonIds.push(id);
+			await ctx.answerCbQuery('⭐ Добавлено в избранное!');
 		}
+
+		await user.save();
+		return;
 	}
 
 	if (data === 'already_liked') {
