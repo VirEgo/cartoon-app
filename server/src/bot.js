@@ -76,7 +76,8 @@ function generateCartoonButtons(user, cartoon) {
 		`togglefav_${cartoon.id}`,
 	);
 
-	return Markup.inlineKeyboard([[likeButton, dislikeButton], [favButton]]);
+	return Markup.inlineKeyboard([[likeButton, dislikeButton], [favButton]])
+		.reply_markup;
 }
 
 // --- Обработчики команд ---
