@@ -1,7 +1,7 @@
 require('dotenv').config();
 
 // Константы
-const ADMIN_ID = parseInt(process.env.ADMIN_ID);
+const ADMIN_ID = Number(process.env.ADMIN_ID);
 const PORT = process.env.PORT || 3001;
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;

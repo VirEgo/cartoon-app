@@ -24,7 +24,51 @@ const {
 
 const bot = new Telegraf(TELEGRAM_BOT_TOKEN);
 
+const userActionTimestamps = new Map(); // Хранит временные метки действий пользователей
+function limitUserActions({
+	generalLimitMs = 5 * 60 * 1000,
+	cartoonLimitMs = 3000,
+} = {}) {
+	return async (ctx, next) => {
+		const userId = ctx.from?.id;
+		if (!userId) return next();
+
+		const now = Date.now();
+		const text = ctx.message?.text?.trim();
+		const isCartoonRequest =
+			text === '🎲 Мультфильм' ||
+			text === '/random' ||
+			ctx.callbackQuery?.data === 'random';
+
+		const lastTimes = userActionTimestamps.get(userId) || {
+			general: 0,
+			cartoon: 0,
+		};
+
+		if (isCartoonRequest) {
+			if (now - lastTimes.cartoon < cartoonLimitMs) {
+				await ctx.reply('⏳ Подожди пару секунд перед следующим мультфильмом.');
+				return;
+			}
+			lastTimes.cartoon = now;
+		} else {
+			if (now - lastTimes.general < generalLimitMs) {
+				await ctx.answerCbQuery?.('⏳ Подожди немного перед повтором.', {
+					show_alert: false,
+				});
+				return;
+			}
+			lastTimes.general = now;
+		}
+
+		userActionTimestamps.set(userId, lastTimes);
+		await next();
+	};
+}
+
 // Middleware для логирования и получения пользователя
+
+bot.use(limitUserActions());
 bot.use(async (ctx, next) => {
 	const chatId = ctx.chat?.id || ctx.from?.id;
 	const username = ctx.from?.username;
@@ -313,7 +357,6 @@ bot.on('text', async (ctx) => {
 				}...`;
 
 				const replyMarkup = generateCartoonButtons(user, cartoon);
-				console.log('Generated replyMarkup:', JSON.stringify(replyMarkup));
 				if (photoUrl) {
 					try {
 						await ctx.replyWithPhoto(photoUrl, {
@@ -386,8 +429,6 @@ bot.on('text', async (ctx) => {
 bot.on('callback_query', async (ctx) => {
 	const user = ctx.state.user;
 	const data = ctx.callbackQuery.data;
-
-	console.log('Callback query data:', data);
 	// Отвечаем на callback query, чтобы убрать "часики"
 	await ctx.answerCbQuery();
 
@@ -585,22 +626,21 @@ bot.on('callback_query', async (ctx) => {
 				`🎂 Возраст: ${user.age || '—'}\n` +
 				`📊 Текущее: ${user.requestCount}/${REQUEST_LIMIT}`;
 
-			await ctx.reply('Мы передали твой запрос!');
-
+			await ctx.answerCbQuery('Мы передали твой запрос!', {
+				show_alert: true,
+			});
+			const markup = Markup.inlineKeyboard([
+				[
+					Markup.button.callback('✅ Approve', `admin_approve_${ctx.from.id}`),
+					Markup.button.callback('♾ Unlimit', `admin_unlimit_${ctx.from.id}`),
+				],
+				[
+					Markup.button.callback('⛔️ Limit', `admin_limit_${ctx.from.id}`),
+					Markup.button.callback('ℹ️ Get Info', `admin_get_${ctx.from.id}`),
+				],
+			]);
 			await ctx.telegram.sendMessage(ADMIN_ID, msg, {
-				reply_markup: Markup.inlineKeyboard([
-					[
-						Markup.button.callback(
-							'✅ Approve',
-							`admin_approve_${ctx.from.id}`,
-						),
-						Markup.button.callback('♾ Unlimit', `admin_unlimit_${ctx.from.id}`),
-					],
-					[
-						Markup.button.callback('⛔️ Limit', `admin_limit_${ctx.from.id}`),
-						Markup.button.callback('ℹ️ Get Info', `admin_get_${ctx.from.id}`),
-					],
-				]),
+				reply_markup: markup.reply_markup,
 			});
 			break;
 		default:
@@ -612,11 +652,9 @@ bot.on('callback_query', async (ctx) => {
 	}
 });
 
-// Обработчик ошибок
 bot.catch((err, ctx) => {
 	console.error(`❌ Ошибка для @${ctx.from?.username || 'unknown user'}:`, err);
 	ctx.reply('Произошла внутренняя ошибка. Попробуйте позже.');
 });
 
-// Экспортируем экземпляр бота для использования в index.js
 module.exports = bot;
