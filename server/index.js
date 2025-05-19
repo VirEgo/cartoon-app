@@ -363,7 +363,7 @@ bot.on('text', async (ctx) => {
 				? `https://image.tmdb.org/t/p/w500${cartoon.poster_path}`
 				: null;
 
-			const caption = `<b>${cartoon.title}</b>\nРейтинг: <i>${cartoon.vote_average}</i>\n${cartoon.overview}`;
+			const caption = `<b>${cartoon.title}</b>\nРейтинг: <i>${cartoon.vote_average}</i>\n\n${cartoon.overview}`;
 
 			if (photoUrl) {
 				try {
@@ -373,7 +373,7 @@ bot.on('text', async (ctx) => {
 						reply_markup: generateButtons(user, cartoon),
 					});
 				} catch (e) {
-					console.error('❌ Ошибка при отправке фото:', e.message);
+					console.error('❌ Ошибка при отправке фото 1:', e.message);
 					await ctx.reply(caption, {
 						parse_mode: 'HTML',
 						reply_markup: generateButtons(user, cartoon),
@@ -433,7 +433,6 @@ bot.on('callback_query', async (ctx) => {
 	const chatId = ctx.from.id;
 	const user = await User.findOne({ telegramId: chatId });
 	const data = ctx.callbackQuery.data;
-	console.log(chatId, ADMIN_ID, ctx.callbackQuery.data);
 	if (!user) return ctx.answerCbQuery('Ошибка пользователя');
 
 	if (data.startsWith('admin_')) {
@@ -615,13 +614,20 @@ bot.on('callback_query', async (ctx) => {
 	}
 });
 
-bot.telegram.setWebhook(`${process.env.RENDER_EXTERNAL_URL}/webhook`);
-app.use(bot.webhookCallback('/webhook'));
+(async () => {
+	if (process.env.RENDER_EXTERNAL_URL) {
+		// 🔗 Рендер: запускаем в режиме Webhook
+		const webhookUrl = `${process.env.RENDER_EXTERNAL_URL}/webhook`;
+		await bot.telegram.setWebhook(webhookUrl);
+		console.log('✅ Webhook установлен:', webhookUrl);
+	} else {
+		// 💻 Локальная разработка: включаем polling
+		await bot.launch();
+		console.log('🚀 Bot запущен в режиме polling');
+	}
 
-app.get('/', (req, res) => {
-	res.send('Bot is running...');
-});
-
-app.listen(PORT, () => {
-	console.log(`🚀 Server listening on port ${PORT}`);
-});
+	// Запускаем сервер
+	app.listen(PORT, () => {
+		console.log(`🌐 Express listening on port ${PORT}`);
+	});
+})();
