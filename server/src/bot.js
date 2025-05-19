@@ -308,11 +308,11 @@ bot.on('text', async (ctx) => {
 				const caption = `<b>${cartoon.title}</b>\nРейтинг: <i>${
 					cartoon.vote_average?.toFixed(1) || '-'
 				}</i>\n\n${
-					cartoon.overview?.slice(0, 500) || 'Описание отсутствует'
-				}...`; // Ограничиваем описание и форматируем рейтинг
+					cartoon.overview?.slice(0, 250) || 'Описание отсутствует'
+				}...`;
 
 				const replyMarkup = generateCartoonButtons(user, cartoon);
-
+				console.log('Generated replyMarkup:', JSON.stringify(replyMarkup));
 				if (photoUrl) {
 					try {
 						await ctx.replyWithPhoto(photoUrl, {
@@ -612,8 +612,7 @@ bot.on('callback_query', async (ctx) => {
 // Обработчик ошибок
 bot.catch((err, ctx) => {
 	console.error(`❌ Ошибка для @${ctx.from?.username || 'unknown user'}:`, err);
-	// Можно отправить сообщение об ошибке пользователю
-	// ctx.reply('Произошла внутренняя ошибка. Попробуйте позже.');
+	ctx.reply('Произошла внутренняя ошибка. Попробуйте позже.');
 });
 
 // Экспортируем экземпляр бота для использования в index.js

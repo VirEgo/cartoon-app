@@ -6,6 +6,7 @@ const {
 	CARTOON_GENRE_ID,
 	MIN_VOTE_AVERAGE,
 	EXCLUDE_ORIGINAL_LANGUAGES,
+	DEFAULT_CERTIFICATION_COUNTRIES,
 } = require('../config/config');
 
 /**
@@ -18,9 +19,13 @@ const {
  */
 async function fetchCartoons({ page, age, seenIds = [], dislikedIds = [] }) {
 	try {
-		const certificationCountryString =
-			DEFAULT_CERTIFICATION_COUNTRIES.join(',');
+		const certificationCountryString = (
+			DEFAULT_CERTIFICATION_COUNTRIES
+				? DEFAULT_CERTIFICATION_COUNTRIES
+				: ['UA', 'RU']
+		).join(',');
 		const excludeOriginalLanguagesString = EXCLUDE_ORIGINAL_LANGUAGES.join(',');
+
 		const res = await axios.get(`${TMDB_BASE_URL}/discover/movie`, {
 			params: {
 				api_key: TMDB_API_KEY,
@@ -30,7 +35,7 @@ async function fetchCartoons({ page, age, seenIds = [], dislikedIds = [] }) {
 				'vote_average.gte': MIN_VOTE_AVERAGE, // исключим плохие мультфильмы
 				region: ['UA', 'RU'], // или другой регион по необходимости
 				page: page,
-				certification_country: certificationCountryString, // или другой регион по необходимости
+				// certification_country: certificationCountryString, // или другой регион по необходимости
 				'certification.lte': age < 6 ? 'G' : 'PG', // Устанавливаем сертификацию в зависимости от возраста
 				exclude_original_language: excludeOriginalLanguagesString, // Исключаем японский язык
 			},
@@ -46,7 +51,7 @@ async function fetchCartoons({ page, age, seenIds = [], dislikedIds = [] }) {
 		return filtered.length ? filtered : all;
 	} catch (error) {
 		console.error('❌ Ошибка при запросе к TMDB:', error.message);
-		throw new Error('Не удалось получить список мультфильмов из TMDB.');
+		throw new Error('Не удалось получить список мультфильмов из TMDB. 11');
 	}
 }
 
