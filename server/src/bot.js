@@ -387,6 +387,7 @@ bot.on('callback_query', async (ctx) => {
 	const user = ctx.state.user;
 	const data = ctx.callbackQuery.data;
 
+	console.log('Callback query data:', data);
 	// Отвечаем на callback query, чтобы убрать "часики"
 	await ctx.answerCbQuery();
 
@@ -530,10 +531,10 @@ bot.on('callback_query', async (ctx) => {
 	// Обработка других callback query
 	switch (data) {
 		case 'already_liked':
-			ctx.reply('Уже нравится ❤️');
+			ctx.reply('Фильм уже в избранном ❤️');
 			break;
 		case 'already_disliked':
-			ctx.reply('Уже не нравится 👎');
+			ctx.reply('Фильм уже в черном списке 👎');
 			break;
 		case 'check_limit':
 			const now = new Date();
@@ -576,12 +577,13 @@ bot.on('callback_query', async (ctx) => {
 				);
 				return;
 			}
-			const msg = `📬 Пользователь @${ctx.from.username || 'Без ника'}
-(${ctx.from.id}) запросил увеличение лимита.
-
-Имя ребёнка: ${user.name || '—'}
-Возраст: ${user.age || '—'}
-Текущее: ${user.requestCount}/${REQUEST_LIMIT}`;
+			const msg =
+				`📬 Пользователь @${ctx.from.username || 'Без ника'} (${
+					ctx.from.id
+				}) запросил увеличение лимита.\n\n` +
+				`👶 Имя ребёнка: ${user.name || '—'}\n` +
+				`🎂 Возраст: ${user.age || '—'}\n` +
+				`📊 Текущее: ${user.requestCount}/${REQUEST_LIMIT}`;
 
 			await ctx.reply('Мы передали твой запрос!');
 
