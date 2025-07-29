@@ -30,16 +30,16 @@ async function start() {
 		// 🔗 Рендер: запускаем в режиме Webhook
 		const webhookUrl = `${process.env.RENDER_EXTERNAL_URL}/webhook`;
 		await bot.telegram.setWebhook(webhookUrl);
-		console.log('✅ Webhook установлен:', webhookUrl);
+		console.log('Webhook установлен:', webhookUrl);
 	} else {
 		// 💻 Локальная разработка: включаем polling
 		await bot.launch();
-		console.log('🚀 Bot запущен в режиме polling');
+		console.log('Bot запущен в режиме polling');
 	}
 
 	// Запускаем Express сервер
 	app.listen(PORT, () => {
-		console.log(`🌐 Express listening on port ${PORT}`);
+		console.log(`Express listening on port ${PORT}`);
 	});
 }
 
@@ -89,7 +89,7 @@ function limitUserActions({
 		const now = Date.now();
 		const text = ctx.message?.text?.trim();
 		const isCartoonRequest =
-			text === '🎲 Мультфильм' ||
+			text === 'Мультфильм' ||
 			text === '/random' ||
 			ctx.callbackQuery?.data === 'random';
 
@@ -100,13 +100,13 @@ function limitUserActions({
 
 		if (isCartoonRequest) {
 			if (now - lastTimes.cartoon < cartoonLimitMs) {
-				await ctx.reply('⏳ Подожди пару секунд перед следующим мультфильмом.');
+				await ctx.reply('Подожди пару секунд перед следующим мультфильмом.');
 				return;
 			}
 			lastTimes.cartoon = now;
 		} else {
 			if (now - lastTimes.general < generalLimitMs) {
-				await ctx.answerCbQuery?.('⏳ Подожди немного перед повтором.', {
+				await ctx.answerCbQuery?.('Подожди немного перед повтором.', {
 					show_alert: false,
 				});
 				return;
@@ -142,10 +142,10 @@ bot.use(async (ctx, next) => {
  */
 function getMainKeyboard() {
 	return Markup.keyboard([
-		['🎲 Мультфильм'],
-		['ℹ️ Мой профиль', '⭐ Избранное'],
-		// ['✏️ Сменить имя', '📅 Сменить возраст'],
-		// ['🔄 Сбросить всё'],
+		['Мультфильм'],
+		['Мой профиль', 'Избранное'],
+		// ['Сменить имя', 'Сменить возраст'],
+		// ['Сбросить всё'],
 	]).resize();
 }
 
@@ -161,15 +161,15 @@ function generateCartoonButtons(user, cartoon) {
 	const alreadyDisliked = user.dislikedCartoonIds?.includes(cartoon.id);
 
 	const likeButton = alreadyLiked
-		? Markup.button.callback('❤️ Уже нравится', 'already_liked')
-		: Markup.button.callback('❤️ Нравится', `like_${cartoon.id}`);
+		? Markup.button.callback('Уже нравится', 'already_liked')
+		: Markup.button.callback('Нравится', `like_${cartoon.id}`);
 
 	const dislikeButton = alreadyDisliked
-		? Markup.button.callback('👎 Уже не нравится', 'already_disliked')
-		: Markup.button.callback('👎 Не нравится', `dislike_${cartoon.id}`);
+		? Markup.button.callback('Уже не нравится', 'already_disliked')
+		: Markup.button.callback('Не нравится', `dislike_${cartoon.id}`);
 
 	const favButton = Markup.button.callback(
-		alreadyInFav ? '⭐ Убрать из избранного' : '⭐ В избранное',
+		alreadyInFav ? 'Убрать из избранного' : 'В избранное',
 		`togglefav_${cartoon.id}`,
 	);
 
@@ -208,10 +208,10 @@ bot.command('approve', async (ctx) => {
 	const user = await resetRequestLimit(targetId);
 	if (!user) return ctx.reply('Пользователь не найден.');
 
-	await ctx.reply(`✅ Лимит сброшен для ${targetId}`);
+	await ctx.reply(`Лимит сброшен для ${targetId}`);
 	await ctx.telegram.sendMessage(
 		targetId,
-		'🎉 Твой лимит был обновлён администратором. Можешь снова искать мультфильмы!',
+		'Твой лимит был обновлён администратором. Можешь снова искать мультфильмы!',
 	);
 });
 
@@ -244,8 +244,8 @@ bot.command('limit', async (ctx) => {
 	const user = await toggleUnlimitedAccess(targetId, false);
 	if (!user) return ctx.reply('Пользователь не найден.');
 
-	await ctx.reply(`⛔️ Убран безлимит у ${targetId}.`);
-	await ctx.telegram.sendMessage(targetId, '⛔️ Безлимитный доступ отключён.');
+	await ctx.reply(`Убран безлимит у ${targetId}.`);
+	await ctx.telegram.sendMessage(targetId, 'Безлимитный доступ отключён.');
 });
 
 bot.command('get', async (ctx) => {
@@ -279,16 +279,16 @@ bot.on('text', async (ctx) => {
 			await user.save();
 			ctx.reply('Введите новое имя:', Markup.removeKeyboard());
 			return;
-		case '📅 Сменить возраст':
+		case 'Сменить возраст':
 			user.step = 'ask_age';
 			await user.save();
 			ctx.reply('Введите новый возраст:', Markup.removeKeyboard());
 			return;
-		case '🔄 Сбросить всё':
+		case 'Сбросить всё':
 			await resetUserData(user.telegramId);
 			ctx.reply('Начинаем заново. Как зовут ребёнка?');
 			return;
-		case '⭐ Избранное':
+		case 'Избранное':
 			if (!user.favoriteCartoonIds || user.favoriteCartoonIds.length === 0) {
 				ctx.reply('У тебя пока нет избранных мультфильмов.');
 				return;
@@ -335,14 +335,14 @@ bot.on('text', async (ctx) => {
 				ctx.reply('Произошла ошибка при загрузке избранного.');
 			}
 			return;
-		case 'ℹ️ Мой профиль':
+		case 'Мой профиль':
 			ctx.reply(
-				`👶 Имя: ${user.name || 'не указано'}\n🎂 Возраст: ${
+				`Имя: ${user.name || 'не указано'}\n Возраст: ${
 					user.age || 'не указан'
 				}`,
 			);
 			return;
-		case '🎲 Мультфильм':
+		case 'Мультфильм':
 			if (user.step !== 'done') {
 				ctx.reply('Сначала заполни анкету. Введи /start.');
 				return;
@@ -358,7 +358,7 @@ bot.on('text', async (ctx) => {
 					user.requestCount = 0;
 					user.lastResetAt = now;
 					await user.save();
-					await ctx.reply('🎉 Лимит обновлён! Поиск снова доступен.');
+					await ctx.reply('Лимит обновлён! Поиск снова доступен.');
 				}
 
 				if (user.requestCount >= REQUEST_LIMIT) {
@@ -369,9 +369,9 @@ bot.on('text', async (ctx) => {
 					return ctx.reply(
 						`⏳ Ты исчерпал лимит. Следующий доступ будет через ${hours}ч ${minutes}м.`,
 						Markup.inlineKeyboard([
-							Markup.button.callback('🔄 Проверить', 'check_limit'),
+							Markup.button.callback('Проверить', 'check_limit'),
 							Markup.button.callback(
-								'📩 Запросить увеличение лимита',
+								'Запросить увеличение лимита',
 								'request_more',
 							),
 						]),
@@ -418,7 +418,7 @@ bot.on('text', async (ctx) => {
 							reply_markup: replyMarkup,
 						});
 					} catch (e) {
-						console.error('❌ Ошибка при отправке фото:', e.message);
+						console.error('Ошибка при отправке фото:', e.message);
 						// Если отправка фото не удалась, отправляем только текст
 						await ctx.reply(caption, {
 							parse_mode: 'HTML',
@@ -439,7 +439,7 @@ bot.on('text', async (ctx) => {
 					await user.save(); // Сохраняем после увеличения счетчика
 				}
 			} catch (err) {
-				console.error('❌ Общая ошибка при поиске мультфильма:', err);
+				console.error('Общая ошибка при поиске мультфильма:', err);
 				await ctx.reply('Произошла ошибка при поиске мультфильма.');
 			}
 
@@ -466,7 +466,7 @@ bot.on('text', async (ctx) => {
 				await user.save();
 
 				await ctx.reply(
-					`✅ Возраст успешно изменён на ${age}\n\n⬇️ Готово! Используй меню ниже:`,
+					`Возраст успешно изменён на ${age}\n\n Готово! Используй меню ниже:`,
 					getMainKeyboard(),
 				);
 				return;
@@ -503,10 +503,10 @@ bot.on('callback_query', async (ctx) => {
 			switch (action) {
 				case 'approve':
 					await resetRequestLimit(targetId);
-					await ctx.editMessageText(`✅ Лимит сброшен для ${targetId}`);
+					await ctx.editMessageText(`Лимит сброшен для ${targetId}`);
 					await ctx.telegram.sendMessage(
 						targetId,
-						'🎉 Администратор обновил твой лимит. Приятного просмотра!',
+						'Администратор обновил твой лимит. Приятного просмотра!',
 					);
 					break;
 				case 'unlimit':
@@ -514,22 +514,20 @@ bot.on('callback_query', async (ctx) => {
 					await ctx.reply(`♾ Безлимит включен для ${targetId}`);
 					await ctx.telegram.sendMessage(
 						targetId,
-						'✨ Администратор дал тебе безлимитный доступ!',
+						'Администратор дал тебе безлимитный доступ!',
 					);
 					break;
 				case 'limit':
 					await toggleUnlimitedAccess(targetId, false);
-					await ctx.reply(`⛔️ Безлимит отключён для ${targetId}`);
+					await ctx.reply(`Безлимит отключён для ${targetId}`);
 					await ctx.telegram.sendMessage(
 						targetId,
-						'⛔️ Безлимитный доступ отключён.',
+						'Безлимитный доступ отключён.',
 					);
 					break;
 				case 'get':
 					await ctx.reply(
-						`👤 Пользователь @${
-							targetUser.username || 'неизвестно'
-						} (${targetId})\n` +
+						`Пользователь @${targetUser.username || 'неизвестно'} (${targetId})\n` +
 							`Имя: ${targetUser.name || '-'}\nВозраст: ${
 								targetUser.age || '-'
 							}\n` +
@@ -541,7 +539,7 @@ bot.on('callback_query', async (ctx) => {
 					ctx.reply('Неизвестная админская команда.');
 			}
 		} catch (error) {
-			console.error('❌ Ошибка в админской команде:', error);
+			console.error('Ошибка в админской команде:', error);
 			ctx.reply('Произошла ошибка при выполнении админской команды.');
 		}
 		return;
@@ -560,7 +558,7 @@ bot.on('callback_query', async (ctx) => {
 					generateCartoonButtons(updatedUser, { id }),
 				);
 			} catch (e) {
-				console.warn('⚠️ Не удалось обновить кнопки после лайка:', e.message);
+				console.warn('Не удалось обновить кнопки после лайка:', e.message);
 				// Игнорируем ошибку, если сообщение не может быть изменено (например, слишком старое)
 			}
 		} else {
@@ -583,7 +581,7 @@ bot.on('callback_query', async (ctx) => {
 				);
 			} catch (e) {
 				console.warn(
-					'⚠️ Не удалось обновить кнопки после дизлайка:',
+					'Не удалось обновить кнопки после дизлайка:',
 					e.message,
 				);
 			}
@@ -609,12 +607,12 @@ bot.on('callback_query', async (ctx) => {
 				);
 			} catch (e) {
 				console.warn(
-					'⚠️ Не удалось обновить кнопки после добавления/удаления из избранного:',
+					'Не удалось обновить кнопки после добавления/удаления из избранного:',
 					e.message,
 				);
 			}
 			ctx.reply(
-				added ? '⭐ Добавлено в избранное!' : '⭐ Убрано из избранного!',
+				added ? 'Добавлено в избранное!' : 'Убрано из избранного!',
 			);
 		} else {
 			ctx.reply('Произошла ошибка при обновлении избранного.');
@@ -625,10 +623,10 @@ bot.on('callback_query', async (ctx) => {
 	// Обработка других callback query
 	switch (data) {
 		case 'already_liked':
-			ctx.reply('Фильм уже в избранном ❤️');
+			ctx.reply('Фильм уже в избранном');
 			break;
 		case 'already_disliked':
-			ctx.reply('Фильм уже в черном списке 👎');
+			ctx.reply('Фильм уже в черном списке');
 			break;
 		case 'check_limit':
 			const now = new Date();
@@ -643,16 +641,16 @@ bot.on('callback_query', async (ctx) => {
 				const hours = Math.floor(msLeft / (1000 * 60 * 60));
 				const minutes = Math.floor((msLeft % (1000 * 60 * 60)) / (1000 * 60));
 
-				const newText = `⏳ Осталось ${hours}ч ${minutes}м`;
+				const newText = `Осталось ${hours}ч ${minutes}м`;
 
 				// Проверяем, изменился ли текст, чтобы избежать ошибки редактирования
 				if (ctx.callbackQuery.message?.text !== newText) {
 					await ctx.editMessageText(newText, {
 						reply_markup: Markup.inlineKeyboard([
-							[Markup.button.callback('🔄 Проверить снова', 'check_limit')],
+							[Markup.button.callback('Проверить снова', 'check_limit')],
 							[
 								Markup.button.callback(
-									'📩 Запросить увеличение лимита',
+									'Запросить увеличение лимита',
 									'request_more',
 								),
 							],
@@ -660,7 +658,7 @@ bot.on('callback_query', async (ctx) => {
 					});
 				} else {
 					// Если текст не изменился, просто отвечаем на callback query
-					// ctx.answerCbQuery('⏳ Время ещё не изменилось'); // Уже ответили в начале
+					// ctx.answerCbQuery('Время ещё не изменилось'); // Уже ответили в начале
 				}
 			}
 			break;
@@ -672,24 +670,24 @@ bot.on('callback_query', async (ctx) => {
 				return;
 			}
 			const msg =
-				`📬 Пользователь @${ctx.from.username || 'Без ника'} (${
+				`Пользователь @${ctx.from.username || 'Без ника'} (${
 					ctx.from.id
 				}) запросил увеличение лимита.\n\n` +
-				`👶 Имя ребёнка: ${user.name || '—'}\n` +
-				`🎂 Возраст: ${user.age || '—'}\n` +
-				`📊 Текущее: ${user.requestCount}/${REQUEST_LIMIT}`;
+				`Имя ребёнка: ${user.name || '—'}\n` +
+				`Возраст: ${user.age || '—'}\n` +
+				`Текущее: ${user.requestCount}/${REQUEST_LIMIT}`;
 
 			await ctx.answerCbQuery('Мы передали твой запрос!', {
 				show_alert: true,
 			});
 			const markup = Markup.inlineKeyboard([
 				[
-					Markup.button.callback('✅ Approve', `admin_approve_${ctx.from.id}`),
-					Markup.button.callback('♾ Unlimit', `admin_unlimit_${ctx.from.id}`),
+					Markup.button.callback('Approve', `admin_approve_${ctx.from.id}`),
+					Markup.button.callback('Unlimit', `admin_unlimit_${ctx.from.id}`),
 				],
 				[
-					Markup.button.callback('⛔️ Limit', `admin_limit_${ctx.from.id}`),
-					Markup.button.callback('ℹ️ Get Info', `admin_get_${ctx.from.id}`),
+					Markup.button.callback('Limit', `admin_limit_${ctx.from.id}`),
+					Markup.button.callback('Get Info', `admin_get_${ctx.from.id}`),
 				],
 			]);
 			await ctx.telegram.sendMessage(ADMIN_ID, msg, {
@@ -698,7 +696,7 @@ bot.on('callback_query', async (ctx) => {
 			break;
 		default:
 			// Неизвестный callback query
-			console.warn(`⚠️ Получен неизвестный callback query: ${data}`);
+			console.warn(`Получен неизвестный callback query: ${data}`);
 			// Можно ответить пользователю или просто проигнорировать
 			// ctx.reply('Неизвестное действие.');
 			break;
@@ -706,7 +704,7 @@ bot.on('callback_query', async (ctx) => {
 });
 
 bot.catch((err, ctx) => {
-	console.error(`❌ Ошибка для @${ctx.from?.username || 'unknown user'}:`, err);
+	console.error(`Ошибка для @${ctx.from?.username || 'unknown user'}:`, err);
 	ctx.reply('Произошла внутренняя ошибка. Попробуйте позже.');
 });
 
@@ -732,21 +730,21 @@ const DEFAULT_CERTIFICATION_COUNTRIES = ['UA', 'RU']; // Страны для с�
 // Проверка наличия необходимых переменных окружения
 if (!TELEGRAM_BOT_TOKEN) {
 	console.error(
-		'❌ Ошибка: Переменная окружения TELEGRAM_BOT_TOKEN не установлена.',
+		'Ошибка: Переменная окружения TELEGRAM_BOT_TOKEN не установлена.',
 	);
 	process.exit(1);
 }
 if (!MONGO_URI) {
-	console.error('❌ Ошибка: Переменная окружения MONGO_URI не установлена.');
+	console.error('Ошибка: Переменная окружения MONGO_URI не установлена.');
 	process.exit(1);
 }
 if (!TMDB_API_KEY) {
-	console.error('❌ Ошибка: Переменная окружения TMDB_API_KEY не установлена.');
+	console.error('Ошибка: Переменная окружения TMDB_API_KEY не установлена.');
 	process.exit(1);
 }
 if (isNaN(ADMIN_ID)) {
 	console.warn(
-		'⚠️ Предупреждение: Переменная окружения ADMIN_ID не установлена или некорректна. Админ-команды будут недоступны.',
+		'Предупреждение: Переменная окружения ADMIN_ID не установлена или некорректна. Админ-команды будут недоступны.',
 	);
 }
 
@@ -775,9 +773,9 @@ const { MONGO_URI } = require('../config/config');
 async function connectDB() {
 	try {
 		await mongoose.connect(MONGO_URI);
-		console.log('✅ Подключено к MongoDB');
+		console.log('Подключено к MongoDB');
 	} catch (err) {
-		console.error('❌ Ошибка подключения к MongoDB:', err);
+		console.error('Ошибка подключения к MongoDB:', err);
 		// Можно добавить более продвинутую обработку ошибок или выход из приложения
 		process.exit(1);
 	}
@@ -841,7 +839,7 @@ async function fetchCartoons({ page, age, seenIds = [], dislikedIds = [] }) {
 		// Если после фильтрации ничего не осталось, вернем все (возможно, стоит пересмотреть эту логику)
 		return filtered.length ? filtered : all;
 	} catch (error) {
-		console.error('❌ Ошибка при запросе к TMDB:', error.message);
+		console.error('Ошибка при запросе к TMDB:', error.message);
 		throw new Error('Не удалось получить список мультфильмов из TMDB. 11');
 	}
 }
@@ -862,7 +860,7 @@ async function getCartoonDetails(cartoonId) {
 		return res.data;
 	} catch (error) {
 		console.error(
-			`❌ Ошибка при запросе деталей мультфильма ${cartoonId} к TMDB:`,
+			`Ошибка при запросе деталей мультфильма ${cartoonId} к TMDB:`,
 			error.message,
 		);
 		return null;
@@ -900,7 +898,7 @@ async function getTotalCartoonPages() {
 		return res.data.total_pages || 1; // Вернем 1, если total_pages отсутствует или 0
 	} catch (error) {
 		console.error(
-			'❌ Ошибка при запросе общего количества страниц к TMDB:',
+			'Ошибка при запросе общего количества страниц к TMDB:',
 			error.message,
 		);
 		return 1; // В случае ошибки вернем 1 страницу
@@ -942,7 +940,7 @@ async function fetchRandomCartoonImproved(age, seenIds = [], dislikedIds = []) {
 				}
 			});
 		} catch (error) {
-			console.error(`❌ Ошибка при запросе страницы ${page}:`, error.message);
+			console.error(`Ошибка при запросе страницы ${page}:`, error.message);
 			// Продолжаем с другими страницами, даже если одна не загрузилась
 		}
 	}
@@ -954,7 +952,7 @@ async function fetchRandomCartoonImproved(age, seenIds = [], dislikedIds = []) {
 
 	if (filteredUsable.length === 0) {
 		console.warn(
-			'⚠️ Не удалось найти новые мультфильмы, соответствующие критериям, из выбранных случайных страниц.',
+			'Не удалось найти новые мультфильмы, соответствующие критериям, из выбранных случайных страниц.',
 		);
 		// Здесь можно добавить логику для обработки случая, когда новых мультфильмов нет
 		// Например, вернуть null или мультфильм из likedCartoonIds

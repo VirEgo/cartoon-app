@@ -665,7 +665,7 @@ bot.on('callback_query', async (ctx) => {
 });
 
 bot.catch((err, ctx) => {
-	console.error(`❌ Ошибка для @${ctx.from?.username || 'unknown user'}:`, err);
+	console.error(`Ошибка для @${ctx.from?.username || 'unknown user'}:`, err);
 	ctx.reply('Произошла внутренняя ошибка. Попробуйте позже.');
 });
 
