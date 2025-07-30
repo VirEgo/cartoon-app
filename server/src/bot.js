@@ -1,4 +1,7 @@
-const { Telegraf, Markup } = require('telegraf');
+const { Telegraf, Markup, session, Scenes } = require('telegraf');
+const sceneList = require('./telegramTools/movieSettingsScenes');
+const stage = new Scenes.Stage(sceneList);
+
 const {
 	TELEGRAM_BOT_TOKEN,
 	ADMIN_ID,
@@ -7,7 +10,7 @@ const {
 } = require('./config/config');
 const {
 	findOrCreateUser,
-	updateUser,
+	decrementUserStars,
 	resetRequestLimit,
 	toggleUnlimitedAccess,
 	getUserInfo,
@@ -16,6 +19,7 @@ const {
 	toggleFavoriteCartoon,
 	resetUserData,
 } = require('./services/user');
+
 const {
 	fetchRandomCartoonImproved,
 	getCartoonDetails,
@@ -58,6 +62,8 @@ function limitUserActions({
 		};
 
 		if (isCartoonRequest) {
+			console.log(lastTimes, 'Last times:');
+
 			if (now - lastTimes.cartoon < cartoonLimitMs) {
 				await sendRateLimitNotice(
 					'⏳ Подожди пару секунд перед следующим мультфильмом.',
@@ -80,7 +86,7 @@ function limitUserActions({
 
 // Middleware для логирования и получения пользователя
 
-bot.use(limitUserActions());
+// bot.use(limitUserActions());
 bot.use(async (ctx, next) => {
 	const chatId = ctx.chat?.id || ctx.from?.id;
 	const username = ctx.from?.username;
@@ -94,6 +100,9 @@ bot.use(async (ctx, next) => {
 	);
 	await next();
 });
+
+bot.use(session());
+bot.use(stage.middleware());
 
 /**
  * Генерирует основную клавиатуру для пользователя.
@@ -120,21 +129,25 @@ function generateCartoonButtons(user, cartoon) {
 	const alreadyDisliked = user.dislikedCartoonIds?.includes(cartoon.id);
 
 	const likeButton = alreadyLiked
-		? Markup.button.callback('❤️ Уже нравится', 'already_liked')
-		: Markup.button.callback('❤️ Нравится', `like_${cartoon.id}`);
+		? Markup.button.callback('Уже нравится', 'already_liked')
+		: Markup.button.callback('Нравится', `like_${cartoon.id}`);
 
 	const dislikeButton = alreadyDisliked
-		? Markup.button.callback('👎 Уже не нравится', 'already_disliked')
-		: Markup.button.callback('👎 Не нравится', `dislike_${cartoon.id}`);
+		? Markup.button.callback('Убрать дизлайк', 'already_disliked')
+		: Markup.button.callback('Не нравится', `dislike_${cartoon.id}`);
 
 	const favButton = Markup.button.callback(
-		alreadyInFav ? '⭐ Убрать из избранного' : '⭐ В избранное',
+		alreadyInFav ? 'Убрать из избранного' : 'В избранное',
 		`togglefav_${cartoon.id}`,
 	);
 
 	return Markup.inlineKeyboard([[likeButton, dislikeButton], [favButton]])
 		.reply_markup;
 }
+
+const paymentKeyboard = Markup.inlineKeyboard([
+	Markup.button.pay('1 мультфильм за 5 ⭐️'),
+]);
 
 // --- Обработчики команд ---
 bot.start(async (ctx) => {
@@ -167,7 +180,7 @@ bot.command('approve', async (ctx) => {
 	const user = await resetRequestLimit(targetId);
 	if (!user) return ctx.reply('Пользователь не найден.');
 
-	await ctx.reply(`✅ Лимит сброшен для ${targetId}`);
+	await ctx.reply(`Лимит сброшен для ${targetId}`);
 	await ctx.telegram.sendMessage(
 		targetId,
 		'🎉 Твой лимит был обновлён администратором. Можешь снова искать мультфильмы!',
@@ -226,7 +239,12 @@ bot.command('get', async (ctx) => {
 	);
 });
 
-// --- Обработчики текстовых сообщений ---
+bot.action('change_rating', async (ctx) => {
+	await ctx.answerCbQuery();
+	return ctx.scene.enter('ratingScene');
+});
+
+/// --- Обработчики текстовых сообщений ---
 bot.on('text', async (ctx) => {
 	const user = ctx.state.user;
 	const text = ctx.message.text;
@@ -340,17 +358,26 @@ bot.on('text', async (ctx) => {
 
 			// Получаем случайный мультфильм
 			try {
-				// Возраст для поиска может быть немного больше возраста ребенка
-				const searchAge = Math.min(user.age + 2, 12); // Ограничиваем максимальный возраст поиска
 				const cartoon = await fetchRandomCartoonImproved(
-					searchAge,
+					user.age,
 					user.seenCartoonIds,
 					user.dislikedCartoonIds,
+					user.movieFilter.minVoteAverage,
 				);
 
 				if (!cartoon) {
 					await ctx.reply(
-						'Не удалось найти мультфильм, который вы еще не видели.',
+						`Не удалось найти мультфильм, который вы еще не видели.\n\nПопробуйте изменить параметры поиска или запросить больше мультфильмов.\nВы можете изменить возраст ребенка для расширения поисковых возможностей.`,
+						Markup.inlineKeyboard([
+							Markup.button.callback(
+								'Изменить параметры поика',
+								'change_params',
+							),
+							// Markup.button.callback(
+							// 	'📩 Запросить увеличение лимита',
+							// 	'request_more',
+							// ),
+						]),
 					);
 					return;
 				}
@@ -377,8 +404,7 @@ bot.on('text', async (ctx) => {
 							reply_markup: replyMarkup,
 						});
 					} catch (e) {
-						console.error('❌ Ошибка при отправке фото:', e.message);
-						// Если отправка фото не удалась, отправляем только текст
+						console.error('Ошибка при отправке фото:', e.message);
 						await ctx.reply(caption, {
 							parse_mode: 'HTML',
 							reply_markup: replyMarkup,
@@ -401,12 +427,11 @@ bot.on('text', async (ctx) => {
 				console.error('❌ Общая ошибка при поиске мультфильма:', err);
 				await ctx.reply('Произошла ошибка при поиске мультфильма.');
 			}
-
 			return;
 		default:
 			// Обработка шагов анкетирования
 			if (user.step === 'ask_name') {
-				user.name = text.trim(); // Удаляем пробелы по краям
+				user.name = text.trim();
 				user.step = 'ask_age';
 				await user.save();
 				ctx.reply(`Отлично, ${user.name}! Сколько лет ребёнку?`);
@@ -441,8 +466,6 @@ bot.on('text', async (ctx) => {
 bot.on('callback_query', async (ctx) => {
 	const user = ctx.state.user;
 	const data = ctx.callbackQuery.data;
-	// Отвечаем на callback query, чтобы убрать "часики"
-	await ctx.answerCbQuery();
 
 	// Обработка админских callback query
 	if (data.startsWith('admin_')) {
@@ -462,7 +485,7 @@ bot.on('callback_query', async (ctx) => {
 			switch (action) {
 				case 'approve':
 					await resetRequestLimit(targetId);
-					await ctx.editMessageText(`✅ Лимит сброшен для ${targetId}`);
+					await ctx.editMessageText(`Лимит сброшен для ${targetId}`);
 					await ctx.telegram.sendMessage(
 						targetId,
 						'🎉 Администратор обновил твой лимит. Приятного просмотра!',
@@ -478,10 +501,10 @@ bot.on('callback_query', async (ctx) => {
 					break;
 				case 'limit':
 					await toggleUnlimitedAccess(targetId, false);
-					await ctx.reply(`⛔️ Безлимит отключён для ${targetId}`);
+					await ctx.reply(`Безлимит отключён для ${targetId}`);
 					await ctx.telegram.sendMessage(
 						targetId,
-						'⛔️ Безлимитный доступ отключён.',
+						'Безлимитный доступ отключён.',
 					);
 					break;
 				case 'get':
@@ -505,7 +528,6 @@ bot.on('callback_query', async (ctx) => {
 		}
 		return;
 	}
-
 	// Обработка callback query для мультфильмов
 	if (data.startsWith('like_')) {
 		const id = parseInt(data.split('_')[1]);
@@ -518,8 +540,9 @@ bot.on('callback_query', async (ctx) => {
 				await ctx.editMessageReplyMarkup(
 					generateCartoonButtons(updatedUser, { id }),
 				);
+				await ctx.answerCbQuery('Добавлено в избранное ❤️');
 			} catch (e) {
-				console.warn('⚠️ Не удалось обновить кнопки после лайка:', e.message);
+				console.warn('Не удалось обновить кнопки после лайка:', e.message);
 				// Игнорируем ошибку, если сообщение не может быть изменено (например, слишком старое)
 			}
 		} else {
@@ -584,10 +607,14 @@ bot.on('callback_query', async (ctx) => {
 	// Обработка других callback query
 	switch (data) {
 		case 'already_liked':
-			ctx.reply('Фильм уже в избранном ❤️');
+			await ctx.answerCbQuery('Фильм уже в избранном ❤️', {
+				show_alert: true,
+			});
 			break;
 		case 'already_disliked':
-			ctx.reply('Фильм уже в черном списке 👎');
+			await ctx.answerCbQuery('Фильм уже в черном списке 👎', {
+				show_alert: true,
+			});
 			break;
 		case 'check_limit':
 			const now = new Date();
@@ -604,22 +631,22 @@ bot.on('callback_query', async (ctx) => {
 
 				const newText = `⏳ Осталось ${hours}ч ${minutes}м`;
 
-				// Проверяем, изменился ли текст, чтобы избежать ошибки редактирования
+				const keyboard = Markup.inlineKeyboard([
+					[Markup.button.callback('Проверить снова', 'check_limit')],
+					[
+						Markup.button.callback(
+							'Запросить увеличение лимита',
+							'request_more',
+						),
+					],
+					[Markup.button.callback('🎰 1 мультфильм за 5 ⭐️', 'buy_spin')],
+				]);
+
 				if (ctx.callbackQuery.message?.text !== newText) {
-					await ctx.editMessageText(newText, {
-						reply_markup: Markup.inlineKeyboard([
-							[Markup.button.callback('🔄 Проверить снова', 'check_limit')],
-							[
-								Markup.button.callback(
-									'📩 Запросить увеличение лимита',
-									'request_more',
-								),
-							],
-						]),
-					});
+					await ctx.editMessageText(newText, keyboard);
 				} else {
 					// Если текст не изменился, просто отвечаем на callback query
-					// ctx.answerCbQuery('⏳ Время ещё не изменилось'); // Уже ответили в начале
+					ctx.answerCbQuery('Время ещё не изменилось');
 				}
 			}
 			break;
@@ -655,13 +682,63 @@ bot.on('callback_query', async (ctx) => {
 				reply_markup: markup.reply_markup,
 			});
 			break;
+		case 'buy_spin':
+			await ctx.answerCbQuery();
+			const invoice = {
+				title: 'Один спин',
+				description: 'Запуск рандомного мультфильма',
+				payload: 'spin_payload_' + ctx.from.id,
+				provider_token: process.env.PAYMENT_PROVIDER_TOKEN,
+				currency: 'XTR',
+				prices: [{ label: '1 мультфильм', amount: 5 }],
+			};
+			const invoiceLink = await ctx.telegram.createInvoiceLink(invoice);
+			return ctx.replyWithInvoice(invoice, paymentKeyboard);
+		case 'change_params':
+			ctx.reply(
+				`Отлично, ${user.name}. Введите новые параметры поиска мультфильмов:\n\n` +
+					`1️⃣ Жанр (по умолчанию: Мультфильм)\n` +
+					`2️⃣ Минимальный рейтинг (по умолчанию: 5)\n` +
+					`3️⃣ Исключить оригинальные языки (по умолчанию: японский)\n` +
+					`4️⃣ Страны сертификации (по умолчанию: UA, RU)\n`,
+				Markup.inlineKeyboard([
+					// [Markup.button.callback('Изменить жанр', 'change_genre')],
+					[Markup.button.callback('Изменить рейтинг', 'change_rating')],
+					[Markup.button.callback('Изменить языки', 'change_languages')],
+					[Markup.button.callback('Изменить страны', 'change_countries')],
+				]),
+			);
+			break;
 		default:
-			// Неизвестный callback query
-			console.warn(`⚠️ Получен неизвестный callback query: ${data}`);
-			// Можно ответить пользователю или просто проигнорировать
-			// ctx.reply('Неизвестное действие.');
+			console.warn(`Получен неизвестный callback query: ${data}`);
+			ctx.reply('Неизвестное действие.');
 			break;
 	}
+});
+
+bot.on('pre_checkout_query', async (ctx) => {
+	// Всегда отвечаем true, чтобы Telegram продолжил оплату
+	await ctx.answerPreCheckoutQuery(true);
+});
+
+bot.on('successful_payment', async (ctx) => {
+	const cartoon = await getRandomCartoon();
+	// отправляем результат
+	await ctx.replyWithPhoto(
+		{ url: cartoon.imageUrl },
+		{
+			caption: `🎉 Спасибо! Вот Ваш новый мультфильм: *${cartoon.title}*`,
+			parse_mode: 'Markdown',
+			...Markup.inlineKeyboard([
+				[
+					Markup.button.callback(
+						'⭐ Добавить в избранное',
+						`togglefav_${cartoon.id}`,
+					),
+				],
+			]),
+		},
+	);
 });
 
 bot.catch((err, ctx) => {

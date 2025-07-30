@@ -49,6 +49,33 @@ async function toggleUnlimitedAccess(telegramId, isUnlimited) {
 }
 
 /**
+ * Обновляет только фильтры поиска (movieFilter) для пользователя
+ * @param {number} telegramId - ID пользователя Telegram
+ * @param {object} filterUpdates - объект с полями из movieFilter для обновления
+ * @returns {Promise<User|null>} - обновлённый пользователь или null, если не найден
+ */
+async function updateMovieFilter(telegramId, filterUpdates) {
+	// Подготавливаем $set для вложенных полей
+	const setData = {};
+	for (const [key, value] of Object.entries(filterUpdates)) {
+		setData[`movieFilter.${key}`] = value;
+	}
+
+	const updated = await User.findOneAndUpdate(
+		{ telegramId },
+		{ $set: setData },
+		{
+			new: true,
+			runValidators: true,
+			context: 'query',
+			select: '-__v',
+		},
+	).exec();
+
+	return updated;
+}
+
+/**
  * Получает информацию о пользователе.
  * @param {number} telegramId - Telegram ID пользователя.
  * @returns {Promise<User|null>} - Объект пользователя или null, если пользователь не найден.
@@ -132,6 +159,22 @@ async function resetUserData(telegramId) {
 	});
 }
 
+/**
+ * Попытается атомарно уменьшить количество звёзд у пользователя.
+ * @param {number} telegramId
+ * @param {number} amount
+ * @returns {Promise<User|null>} — обновлённый документ пользователя или null, если звёзд не хватило
+ */
+async function decrementUserStars(telegramId, amount) {
+	// findOneAndUpdate с условием stars >= amount гарантирует атомарность
+	const updated = await User.findOneAndUpdate(
+		{ telegramId, stars: { $gte: amount } },
+		{ $inc: { stars: -amount } },
+		{ new: true },
+	);
+	return updated; // null, если условие не выполнилось
+}
+
 module.exports = {
 	findOrCreateUser,
 	updateUser,
@@ -142,4 +185,6 @@ module.exports = {
 	addDislikedCartoon,
 	toggleFavoriteCartoon,
 	resetUserData,
+	decrementUserStars,
+	updateMovieFilter,
 };

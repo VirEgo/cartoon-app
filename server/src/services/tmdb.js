@@ -17,7 +17,13 @@ const {
  * @param {number[]} [dislikedIds=[]] - Список ID не понравившихся мультфильмов.
  * @returns {Promise<object[]>} - Массив объектов мультфильмов.
  */
-async function fetchCartoons({ page, age, seenIds = [], dislikedIds = [] }) {
+async function fetchCartoons({
+	page,
+	age,
+	seenIds = [],
+	dislikedIds = [],
+	minVoteAverage = MIN_VOTE_AVERAGE,
+}) {
 	try {
 		const certificationCountryString = (
 			DEFAULT_CERTIFICATION_COUNTRIES
@@ -32,7 +38,7 @@ async function fetchCartoons({ page, age, seenIds = [], dislikedIds = [] }) {
 				with_genres: CARTOON_GENRE_ID,
 				language: 'ru',
 				include_adult: false,
-				'vote_average.gte': MIN_VOTE_AVERAGE, // исключим плохие мультфильмы
+				'vote_average.gte': minVoteAverage, // исключим плохие мультфильмы
 				region: ['UA', 'RU'], // или другой регион по необходимости
 				page: page,
 				// certification_country: certificationCountryString, // или другой регион по необходимости
@@ -50,7 +56,7 @@ async function fetchCartoons({ page, age, seenIds = [], dislikedIds = [] }) {
 		// Если после фильтрации ничего не осталось, вернем все (возможно, стоит пересмотреть эту логику)
 		return filtered.length ? filtered : all;
 	} catch (error) {
-		console.error('❌ Ошибка при запросе к TMDB:', error.message);
+		console.error('Ошибка при запросе к TMDB:', error.message);
 		throw new Error('Не удалось получить список мультфильмов из TMDB. 11');
 	}
 }
@@ -71,7 +77,7 @@ async function getCartoonDetails(cartoonId) {
 		return res.data;
 	} catch (error) {
 		console.error(
-			`❌ Ошибка при запросе деталей мультфильма ${cartoonId} к TMDB:`,
+			`Ошибка при запросе деталей мультфильма ${cartoonId} к TMDB:`,
 			error.message,
 		);
 		return null;
@@ -109,7 +115,7 @@ async function getTotalCartoonPages() {
 		return res.data.total_pages || 1; // Вернем 1, если total_pages отсутствует или 0
 	} catch (error) {
 		console.error(
-			'❌ Ошибка при запросе общего количества страниц к TMDB:',
+			'Ошибка при запросе общего количества страниц к TMDB:',
 			error.message,
 		);
 		return 1; // В случае ошибки вернем 1 страницу
@@ -123,7 +129,12 @@ async function getTotalCartoonPages() {
  * @param {number[]} [dislikedIds=[]] - Список ID не понравившихся мультфильмов.
  * @returns {Promise<object|null>} - Объект случайного мультфильма или null, если не найдено.
  */
-async function fetchRandomCartoonImproved(age, seenIds = [], dislikedIds = []) {
+async function fetchRandomCartoonImproved(
+	age,
+	seenIds = [],
+	dislikedIds = [],
+	minVoteAverage = MIN_VOTE_AVERAGE,
+) {
 	const totalPages = await getTotalCartoonPages();
 	const maxPageToConsider = Math.min(totalPages, 100); // Ограничим, например, 100 страницами
 
@@ -143,7 +154,13 @@ async function fetchRandomCartoonImproved(age, seenIds = [], dislikedIds = []) {
 	// Запрашиваем мультфильмы с выбранных случайных страниц
 	for (const page of pagesToFetch) {
 		try {
-			const cartoons = await fetchCartoons({ page, age, seenIds, dislikedIds });
+			const cartoons = await fetchCartoons({
+				page,
+				age,
+				seenIds,
+				dislikedIds,
+				minVoteAverage,
+			});
 			// Добавляем только те мультфильмы, которые еще не были добавлены (избегаем дубликатов, если мультфильм на нескольких страницах)
 			cartoons.forEach((cartoon) => {
 				if (!usableCartoons.some((c) => c.id === cartoon.id)) {
@@ -151,7 +168,7 @@ async function fetchRandomCartoonImproved(age, seenIds = [], dislikedIds = []) {
 				}
 			});
 		} catch (error) {
-			console.error(`❌ Ошибка при запросе страницы ${page}:`, error.message);
+			console.error(`Ошибка при запросе страницы ${page}:`, error.message);
 			// Продолжаем с другими страницами, даже если одна не загрузилась
 		}
 	}
@@ -163,7 +180,7 @@ async function fetchRandomCartoonImproved(age, seenIds = [], dislikedIds = []) {
 
 	if (filteredUsable.length === 0) {
 		console.warn(
-			'⚠️ Не удалось найти новые мультфильмы, соответствующие критериям, из выбранных случайных страниц.',
+			'Не удалось найти новые мультфильмы, соответствующие критериям, из выбранных случайных страниц.',
 		);
 		// Здесь можно добавить логику для обработки случая, когда новых мультфильмов нет
 		// Например, вернуть null или мультфильм из likedCartoonIds

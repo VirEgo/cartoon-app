@@ -527,7 +527,9 @@ bot.on('callback_query', async (ctx) => {
 					break;
 				case 'get':
 					await ctx.reply(
-						`Пользователь @${targetUser.username || 'неизвестно'} (${targetId})\n` +
+						`Пользователь @${
+							targetUser.username || 'неизвестно'
+						} (${targetId})\n` +
 							`Имя: ${targetUser.name || '-'}\nВозраст: ${
 								targetUser.age || '-'
 							}\n` +
@@ -580,10 +582,7 @@ bot.on('callback_query', async (ctx) => {
 					generateCartoonButtons(updatedUser, { id }),
 				);
 			} catch (e) {
-				console.warn(
-					'Не удалось обновить кнопки после дизлайка:',
-					e.message,
-				);
+				console.warn('Не удалось обновить кнопки после дизлайка:', e.message);
 			}
 		} else {
 			ctx.reply('Уже отмечен как неинтересный.');
@@ -611,9 +610,7 @@ bot.on('callback_query', async (ctx) => {
 					e.message,
 				);
 			}
-			ctx.reply(
-				added ? 'Добавлено в избранное!' : 'Убрано из избранного!',
-			);
+			ctx.reply(added ? 'Добавлено в избранное!' : 'Убрано из избранного!');
 		} else {
 			ctx.reply('Произошла ошибка при обновлении избранного.');
 		}
@@ -918,7 +915,7 @@ async function fetchRandomCartoonImproved(age, seenIds = [], dislikedIds = []) {
 
 	const pagesToFetch = new Set();
 	// Выберем несколько случайных уникальных страниц
-	const numberOfPagesToFetch = 5; // Например, 5 случайных страниц
+	const numberOfPagesToFetch = 15; // Например, 5 случайных страниц
 	while (
 		pagesToFetch.size < numberOfPagesToFetch &&
 		pagesToFetch.size < maxPageToConsider

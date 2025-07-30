@@ -14,6 +14,12 @@ const UserSchema = new mongoose.Schema({
 	lastResetAt: { type: Date, default: Date.now },
 	isUnlimited: { type: Boolean, default: false },
 	username: { type: String, default: null },
+	movieFilter: {
+		genre: { type: Number, default: 16 },
+		minVoteAverage: { type: Number, default: 5 },
+		excludeOriginalLanguages: { type: [String], default: ['ja'] },
+		certificationCountries: { type: [String], default: ['UA', 'RU'] },
+	},
 });
 
 module.exports = mongoose.model('User', UserSchema);
