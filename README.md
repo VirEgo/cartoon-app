@@ -8,7 +8,7 @@
 
 ```
 cartoon-client/
-├── client/        # React-приложение, деплой на GitHub Pages
+├── client/        # Angular-приложение, деплой на GitHub Pages (?)
 ├── server/        # Telegram-бот + API, деплой на Render
 ```
 
@@ -19,11 +19,11 @@ cartoon-client/
 ### Команды
 
 ```bash
-cd client
+cd client/cartoon-randomizer
 npm install
-npm run dev       # локальный запуск
-npm run build     # сборка для продакшена
-npm run deploy    # публикация на GitHub Pages
+ng s       # локальный запуск
+ng build     # сборка для продакшена
+ng deploy    # публикация на GitHub Pages
 ```
 
 ### GitHub Pages

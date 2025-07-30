@@ -1,16 +1,21 @@
 const { Telegraf, Markup, session, Scenes } = require('telegraf');
-const sceneList = require('./telegramTools/movieSettingsScenes');
-const stage = new Scenes.Stage(sceneList);
+const sceneList = require('./telegramTools/scenes/movieSettingsScenes');
+const userProfileScenes = require('./telegramTools/scenes/userProfileScenes');
+const {
+	initializeAdminCommands,
+	initializeAdminCallbacks,
+} = require('./telegramTools/adminCommandsConfig/commandConfig');
+const stage = new Scenes.Stage([...sceneList, ...userProfileScenes]);
 
 const {
 	TELEGRAM_BOT_TOKEN,
 	ADMIN_ID,
 	REQUEST_LIMIT,
 	LIMIT_RESET_INTERVAL_MS,
+	PAYMENT_PROVIDER_TOKEN,
 } = require('./config/config');
 const {
 	findOrCreateUser,
-	decrementUserStars,
 	resetRequestLimit,
 	toggleUnlimitedAccess,
 	getUserInfo,
@@ -28,7 +33,12 @@ const {
 
 const bot = new Telegraf(TELEGRAM_BOT_TOKEN);
 
-const userActionTimestamps = new Map(); // Хранит временные метки действий пользователей
+const paymentKeyboard = Markup.inlineKeyboard([
+	Markup.button.pay('1 мультфильм за 5 ⭐️'),
+]);
+
+const userActionTimestamps = new Map();
+
 function limitUserActions({
 	generalLimitMs = 5 * 60 * 1000,
 	cartoonLimitMs = 3000,
@@ -53,10 +63,8 @@ function limitUserActions({
 		// Вспомогательная функция для ответа об ошибке
 		const sendRateLimitNotice = (message) => {
 			if (ctx.callbackQuery) {
-				// Убираем «крутилку» в inline-кнопке
 				return ctx.answerCbQuery(message, { show_alert: false });
 			} else {
-				// Обычное сообщение в чат
 				return ctx.reply(message);
 			}
 		};
@@ -66,14 +74,14 @@ function limitUserActions({
 
 			if (now - lastTimes.cartoon < cartoonLimitMs) {
 				await sendRateLimitNotice(
-					'⏳ Подожди пару секунд перед следующим мультфильмом.',
+					'Подожди пару секунд перед следующим мультфильмом.',
 				);
 				return;
 			}
 			lastTimes.cartoon = now;
 		} else {
 			if (now - lastTimes.general < generalLimitMs) {
-				await sendRateLimitNotice('⏳ Подожди немного перед повтором.');
+				await sendRateLimitNotice('Подожди немного перед повтором.');
 				return;
 			}
 			lastTimes.general = now;
@@ -83,8 +91,6 @@ function limitUserActions({
 		await next();
 	};
 }
-
-// Middleware для логирования и получения пользователя
 
 // bot.use(limitUserActions());
 bot.use(async (ctx, next) => {
@@ -145,10 +151,6 @@ function generateCartoonButtons(user, cartoon) {
 		.reply_markup;
 }
 
-const paymentKeyboard = Markup.inlineKeyboard([
-	Markup.button.pay('1 мультфильм за 5 ⭐️'),
-]);
-
 // --- Обработчики команд ---
 bot.start(async (ctx) => {
 	const user = ctx.state.user;
@@ -169,74 +171,10 @@ bot.start(async (ctx) => {
 });
 
 // Команды администратора
-bot.command('approve', async (ctx) => {
-	if (ctx.from.id !== ADMIN_ID) return;
+initializeAdminCommands(bot);
 
-	const args = ctx.message.text.split(' ');
-	const targetId = parseInt(args[1]);
-	if (isNaN(targetId))
-		return ctx.reply('Нужно указать Telegram ID пользователя.');
-
-	const user = await resetRequestLimit(targetId);
-	if (!user) return ctx.reply('Пользователь не найден.');
-
-	await ctx.reply(`Лимит сброшен для ${targetId}`);
-	await ctx.telegram.sendMessage(
-		targetId,
-		'🎉 Твой лимит был обновлён администратором. Можешь снова искать мультфильмы!',
-	);
-});
-
-bot.command('unlimit', async (ctx) => {
-	if (ctx.from.id !== ADMIN_ID) return;
-
-	const args = ctx.message.text.split(' ');
-	const targetId = parseInt(args[1]);
-	if (isNaN(targetId))
-		return ctx.reply('Нужно указать Telegram ID пользователя.');
-
-	const user = await toggleUnlimitedAccess(targetId, true);
-	if (!user) return ctx.reply('Пользователь не найден.');
-
-	await ctx.reply(`♾ Пользователь ${targetId} теперь безлимитный.`);
-	await ctx.telegram.sendMessage(
-		targetId,
-		'✨ Администратор дал тебе безлимитный доступ!',
-	);
-});
-
-bot.command('limit', async (ctx) => {
-	if (ctx.from.id !== ADMIN_ID) return;
-
-	const args = ctx.message.text.split(' ');
-	const targetId = parseInt(args[1]);
-	if (isNaN(targetId))
-		return ctx.reply('Нужно указать Telegram ID пользователя.');
-
-	const user = await toggleUnlimitedAccess(targetId, false);
-	if (!user) return ctx.reply('Пользователь не найден.');
-
-	await ctx.reply(`⛔️ Убран безлимит у ${targetId}.`);
-	await ctx.telegram.sendMessage(targetId, '⛔️ Безлимитный доступ отключён.');
-});
-
-bot.command('get', async (ctx) => {
-	if (ctx.from.id !== ADMIN_ID) return;
-
-	const args = ctx.message.text.split(' ');
-	const targetId = parseInt(args[1]);
-	if (isNaN(targetId))
-		return ctx.reply('Нужно указать Telegram ID пользователя.');
-
-	const user = await getUserInfo(targetId);
-	if (!user) return ctx.reply('Пользователь не найден.');
-
-	await ctx.reply(
-		`👤 Пользователь @${user.username || 'неизвестно'} (${targetId})\n` +
-			`Имя: ${user.name || '-'}\nВозраст: ${user.age || '-'}\n` +
-			`Запросов: ${user.requestCount}/${REQUEST_LIMIT}\n` +
-			`Безлимит: ${user.isUnlimited ? 'Да' : 'Нет'}`,
-	);
+bot.command('age', async (ctx) => {
+	return ctx.scene.enter('userAgeScene');
 });
 
 bot.action('change_rating', async (ctx) => {
@@ -298,7 +236,7 @@ bot.on('text', async (ctx) => {
 				try {
 					await ctx.replyWithMediaGroup(media);
 				} catch (e) {
-					console.error('❌ Ошибка при отправке медиа-группы:', e.message);
+					console.error('Ошибка при отправке медиа-группы:', e.message);
 					// Отправляем по одному, если медиа-группа не работает (например, слишком много фото)
 					for (const item of media) {
 						await ctx.replyWithPhoto(item.media, {
@@ -308,7 +246,7 @@ bot.on('text', async (ctx) => {
 					}
 				}
 			} catch (e) {
-				console.error('❌ Ошибка при загрузке избранного:', e);
+				console.error('Ошибка при загрузке избранного:', e);
 				ctx.reply('Произошла ошибка при загрузке избранного.');
 			}
 			return;
@@ -467,67 +405,9 @@ bot.on('callback_query', async (ctx) => {
 	const user = ctx.state.user;
 	const data = ctx.callbackQuery.data;
 
-	// Обработка админских callback query
-	if (data.startsWith('admin_')) {
-		if (ctx.from.id !== ADMIN_ID) {
-			return ctx.reply('У вас нет прав для выполнения этой команды.');
-		}
+	// Обработка callback query для админа
+	await initializeAdminCallbacks(bot);
 
-		const [_, action, targetIdStr] = data.split('_');
-		const targetId = parseInt(targetIdStr);
-		if (isNaN(targetId))
-			return ctx.reply('Некорректный Telegram ID пользователя.');
-
-		const targetUser = await getUserInfo(targetId);
-		if (!targetUser) return ctx.reply('Пользователь не найден.');
-
-		try {
-			switch (action) {
-				case 'approve':
-					await resetRequestLimit(targetId);
-					await ctx.editMessageText(`Лимит сброшен для ${targetId}`);
-					await ctx.telegram.sendMessage(
-						targetId,
-						'🎉 Администратор обновил твой лимит. Приятного просмотра!',
-					);
-					break;
-				case 'unlimit':
-					await toggleUnlimitedAccess(targetId, true);
-					await ctx.reply(`♾ Безлимит включен для ${targetId}`);
-					await ctx.telegram.sendMessage(
-						targetId,
-						'✨ Администратор дал тебе безлимитный доступ!',
-					);
-					break;
-				case 'limit':
-					await toggleUnlimitedAccess(targetId, false);
-					await ctx.reply(`Безлимит отключён для ${targetId}`);
-					await ctx.telegram.sendMessage(
-						targetId,
-						'Безлимитный доступ отключён.',
-					);
-					break;
-				case 'get':
-					await ctx.reply(
-						`👤 Пользователь @${
-							targetUser.username || 'неизвестно'
-						} (${targetId})\n` +
-							`Имя: ${targetUser.name || '-'}\nВозраст: ${
-								targetUser.age || '-'
-							}\n` +
-							`Запросов: ${targetUser.requestCount}/${REQUEST_LIMIT}\n` +
-							`Безлимит: ${targetUser.isUnlimited ? 'Да' : 'Нет'}`,
-					);
-					break;
-				default:
-					ctx.reply('Неизвестная админская команда.');
-			}
-		} catch (error) {
-			console.error('❌ Ошибка в админской команде:', error);
-			ctx.reply('Произошла ошибка при выполнении админской команды.');
-		}
-		return;
-	}
 	// Обработка callback query для мультфильмов
 	if (data.startsWith('like_')) {
 		const id = parseInt(data.split('_')[1]);
@@ -684,11 +564,12 @@ bot.on('callback_query', async (ctx) => {
 			break;
 		case 'buy_spin':
 			await ctx.answerCbQuery();
+			const paymentToken = PAYMENT_PROVIDER_TOKEN ?? null;
 			const invoice = {
 				title: 'Один спин',
 				description: 'Запуск рандомного мультфильма',
 				payload: 'spin_payload_' + ctx.from.id,
-				provider_token: process.env.PAYMENT_PROVIDER_TOKEN,
+				provider_token: paymentToken,
 				currency: 'XTR',
 				prices: [{ label: '1 мультфильм', amount: 5 }],
 			};

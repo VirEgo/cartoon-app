@@ -6,7 +6,9 @@ const { MONGO_URI } = require('../config/config');
  */
 async function connectDB() {
 	try {
-		await mongoose.connect(MONGO_URI);
+		await mongoose.connect(MONGO_URI, {
+			serverSelectionTimeoutMS: 5000,
+		});
 		console.log('✅ Подключено к MongoDB');
 	} catch (err) {
 		console.error('❌ Ошибка подключения к MongoDB:', err);

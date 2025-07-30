@@ -18,7 +18,7 @@ const UserSchema = new mongoose.Schema({
 		genre: { type: Number, default: 16 },
 		minVoteAverage: { type: Number, default: 5 },
 		excludeOriginalLanguages: { type: [String], default: ['ja'] },
-		certificationCountries: { type: [String], default: ['UA', 'RU'] },
+		certificationCountries: { type: [String], default: ['RU', 'UA'] },
 	},
 });
 

@@ -13,7 +13,10 @@ try {
 	connectDB = require('./src/db/db').connectDB;
 	bot = require('./src/bot');
 } catch (error) {
-	console.warn('Running in API-only mode (missing some environment variables)');
+	console.warn(
+		'Running in API-only mode (missing some environment variables)',
+		error,
+	);
 }
 
 const app = express();
@@ -80,17 +83,6 @@ app.use((error, req, res, next) => {
 	}
 	res.status(500).json({ error: 'Internal server error' });
 });
-
-// Простой API эндпоинт (если нужен)
-// app.get('/api/random-cartoon', async (req, res) => {
-//     try {
-//         // Здесь можно использовать логику из tmdb.js
-//         const cartoon = await require('./tmdb').fetchRandomCartoonImproved(5); // Пример
-//         res.json(cartoon);
-//     } catch (err) {
-//         res.status(500).json({ error: 'Ошибка при получении мультфильма' });
-//     }
-// });
 
 async function start() {
 	// Подключаемся к базе данных только если доступно

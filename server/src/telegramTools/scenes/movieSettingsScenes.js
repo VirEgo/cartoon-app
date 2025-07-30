@@ -1,6 +1,6 @@
 const { Scenes } = require('telegraf');
 const { BaseScene } = Scenes;
-const { updateMovieFilter } = require('../services/user');
+const { updateMovieFilter } = require('../../services/user');
 
 // const genreScene = new BaseScene('genreScene');
 // genreScene.enter((ctx) => ctx.reply('Введите новый жанр:'));
@@ -21,15 +21,18 @@ ratingScene.on('text', async (ctx) => {
 		return ctx.reply('Неверный ввод, введите число от 1 до 10');
 	}
 
-	ctx.state.user.minRating = val;
-	await ctx.state.user.save();
-	await ctx.reply(`Минимальный рейтинг обновлён: ${val}`);
+	const updated = await updateMovieFilter(ctx.from.id, {
+		minVoteAverage: val,
+	});
+	await ctx.reply(
+		`Минимальный рейтинг обновлён: ${updated.movieFilter.minVoteAverage}`,
+	);
 	return ctx.scene.leave();
 });
 
-ratingScene.leave((ctx) => {
-	updateMovieFilter(ctx.from.id, { minVoteAverage: ctx.state.user.minRating });
-});
+// ratingScene.leave((ctx) => {
+// 	updateMovieFilter(ctx.from.id, { minVoteAverage: ctx.state.user.minRating });
+// });
 
 // Сцены для исключения языков и стран сертификации
 const languageScene = new BaseScene('languageScene');
@@ -56,5 +59,4 @@ countriesScene.on('text', async (ctx) => {
 	return ctx.scene.leave();
 });
 
-//
 module.exports = [ratingScene, languageScene, countriesScene];

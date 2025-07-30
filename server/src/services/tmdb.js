@@ -25,11 +25,7 @@ async function fetchCartoons({
 	minVoteAverage = MIN_VOTE_AVERAGE,
 }) {
 	try {
-		const certificationCountryString = (
-			DEFAULT_CERTIFICATION_COUNTRIES
-				? DEFAULT_CERTIFICATION_COUNTRIES
-				: ['UA', 'RU']
-		).join(',');
+		const certificationCountryString = DEFAULT_CERTIFICATION_COUNTRIES;
 		const excludeOriginalLanguagesString = EXCLUDE_ORIGINAL_LANGUAGES.join(',');
 
 		const res = await axios.get(`${TMDB_BASE_URL}/discover/movie`, {
@@ -39,25 +35,23 @@ async function fetchCartoons({
 				language: 'ru',
 				include_adult: false,
 				'vote_average.gte': minVoteAverage, // исключим плохие мультфильмы
-				region: ['UA', 'RU'], // или другой регион по необходимости
+				region: 'RU', // или другой регион по необходимости
 				page: page,
-				// certification_country: certificationCountryString, // или другой регион по необходимости
+				certification_country: certificationCountryString,
 				'certification.lte': age < 6 ? 'G' : 'PG', // Устанавливаем сертификацию в зависимости от возраста
 				exclude_original_language: excludeOriginalLanguagesString, // Исключаем японский язык
 			},
 		});
 
 		const all = res.data.results;
-		// Фильтруем мультфильмы, которые пользователь уже видел или не любит
 		const filtered = all.filter(
 			(c) => !seenIds.includes(c.id) && !dislikedIds.includes(c.id),
 		);
 
-		// Если после фильтрации ничего не осталось, вернем все (возможно, стоит пересмотреть эту логику)
 		return filtered.length ? filtered : all;
 	} catch (error) {
 		console.error('Ошибка при запросе к TMDB:', error.message);
-		throw new Error('Не удалось получить список мультфильмов из TMDB. 11');
+		throw new Error('Не удалось получить список мультфильмов из TMDB.');
 	}
 }
 
@@ -106,10 +100,10 @@ async function getTotalCartoonPages() {
 				language: 'ru',
 				include_adult: false,
 				'vote_average.gte': MIN_VOTE_AVERAGE,
-				region: 'UA',
-				certification_country: 'UA',
-				'certification.lte': 'G',
-				page: 1, // Запрашиваем только первую страницу для получения общего количества
+				region: 'RU',
+				certification_country: DEFAULT_CERTIFICATION_COUNTRIES, // Используем первую страну сертификации
+				'certification.lte': 'PG',
+				page: 1,
 			},
 		});
 		return res.data.total_pages || 1; // Вернем 1, если total_pages отсутствует или 0
@@ -169,7 +163,7 @@ async function fetchRandomCartoonImproved(
 			});
 		} catch (error) {
 			console.error(`Ошибка при запросе страницы ${page}:`, error.message);
-			// Продолжаем с другими страницами, даже если одна не загрузилась
+			// Продолжаем с другими страницами даже если одна не загрузилась
 		}
 	}
 

@@ -6,14 +6,19 @@ const PORT = process.env.PORT || 3001;
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const MONGO_URI = process.env.MONGO_URI;
+const PAYMENT_PROVIDER_TOKEN = process.env.PAYMENT_PROVIDER_TOKEN || null;
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
 const CARTOON_GENRE_ID = 16; // ID жанра "Мультфильм" на TMDB
 const MIN_VOTE_AVERAGE = 7; // Минимальный рейтинг мультфильма
 const REQUEST_LIMIT = 10; // Лимит запросов на 1 час
 const LIMIT_RESET_INTERVAL_MS = 1 * 60 * 60 * 1000; // 1 час в миллисекундах
-const EXCLUDE_ORIGINAL_LANGUAGES = ['ja']; // Языки, которые нужно исключить из результатов (например, японский)
-const DEFAULT_CERTIFICATION_COUNTRIES = ['UA', 'RU', 'ES', 'EN']; // Страны для сертификации (например, Украина и Россия)
+const EXCLUDE_ORIGINAL_LANGUAGES = ['ja']; // Языки, которые нужно исключить из результатов
+const DEFAULT_CERTIFICATION_COUNTRIES = 'RU'; // Страны для сертификации
+
+if (!PAYMENT_PROVIDER_TOKEN) {
+	console.warn('PAYMENT_PROVIDER_TOKEN не задан, покупки отключены.');
+}
 
 // Проверка наличия необходимых переменных окружения
 if (!TELEGRAM_BOT_TOKEN) {
@@ -50,4 +55,5 @@ module.exports = {
 	LIMIT_RESET_INTERVAL_MS,
 	EXCLUDE_ORIGINAL_LANGUAGES,
 	DEFAULT_CERTIFICATION_COUNTRIES,
+	PAYMENT_PROVIDER_TOKEN,
 };
