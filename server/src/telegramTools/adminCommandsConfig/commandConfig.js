@@ -1,10 +1,18 @@
 const { ADMIN_ID } = require('../../config/config');
+const {
+	getAllUsers,
+	resetRequestLimit,
+	toggleUnlimitedAccess,
+	getUserInfo,
+} = require('../../services/user');
+const { createPoll, addActivePolls } = require('../../services/TGPollService');
 
-function initializeAdminCommands(bot) {
-	const ctx = bot.context;
+function initializeAdminCommands(botEntity) {
+	const ctx = botEntity.context;
 	if (ctx?.from?.id !== ADMIN_ID) return;
+	console.log(ctx, 'Admin commands initialized for', ctx.from.id);
 
-	bot.command('approve', async (ctx) => {
+	botEntity.command('approve', async (ctx) => {
 		const args = ctx.message.text.split(' ');
 		const targetId = parseInt(args[1]);
 		if (isNaN(targetId))
@@ -20,7 +28,7 @@ function initializeAdminCommands(bot) {
 		);
 	});
 
-	bot.command('unlimit', async (ctx) => {
+	botEntity.command('unlimit', async (ctx) => {
 		const args = ctx.message.text.split(' ');
 		const targetId = parseInt(args[1]);
 		if (isNaN(targetId))
@@ -36,7 +44,7 @@ function initializeAdminCommands(bot) {
 		);
 	});
 
-	bot.command('limit', async (ctx) => {
+	botEntity.command('limit', async (ctx) => {
 		const args = ctx.message.text.split(' ');
 		const targetId = parseInt(args[1]);
 		if (isNaN(targetId))
@@ -49,7 +57,7 @@ function initializeAdminCommands(bot) {
 		await ctx.telegram.sendMessage(targetId, 'Безлимитный доступ отключён.');
 	});
 
-	bot.command('get', async (ctx) => {
+	botEntity.command('get', async (ctx) => {
 		const args = ctx.message.text.split(' ');
 		const targetId = parseInt(args[1]);
 		if (isNaN(targetId))
@@ -65,6 +73,49 @@ function initializeAdminCommands(bot) {
 				`Безлимит: ${user.isUnlimited ? 'Да' : 'Нет'}`,
 		);
 	});
+}
+
+/**
+ * Рассылка опроса всем пользователям.
+ * @param {import('telegraf').Telegram} telegram
+ * @param {string} question — текст опроса
+ * @param {string[]} options — варианты ответа
+ * @returns {Promise<string[]>} — массив отправленных poll_id
+ */
+async function broadcastPollToAll(telegram, question, options) {
+	const users = await getAllUsers();
+	const testUsers = [{ telegramId: 129600319 }, { telegramId: 6121961198 }];
+	const pollIds = [];
+
+	for (const { telegramId: chatId } of testUsers) {
+		if (!chatId) continue;
+		try {
+			const sent = await telegram.sendPoll(chatId, question, options, {
+				is_anonymous: false,
+				open_period: 10 * 60,
+			});
+			pollIds.push(sent.poll.id);
+			await createPoll({
+				pollId: sent.poll.id,
+				chatId, // <- сюда
+				messageId: sent.message_id,
+				question: sent.poll.question,
+				options: sent.poll.options.map((o) => ({
+					text: o.text,
+					voteCount: o.voter_count,
+				})),
+				isAnonymous: sent.poll.is_anonymous,
+				openPeriod: sent.poll.open_period,
+			});
+		} catch (err) {
+			console.error(`Не удалось отправить опрос пользователю ${chatId}:`, err);
+		}
+		await new Promise((r) => setTimeout(r, 34));
+	}
+
+	// сохраняем все poll_id для последующей фильтрации
+	addActivePolls(pollIds);
+	return pollIds;
 }
 
 async function initializeAdminCallbacks(bot) {
@@ -135,4 +186,8 @@ async function initializeAdminCallbacks(bot) {
 	}
 }
 
-module.exports = { initializeAdminCommands, initializeAdminCallbacks };
+module.exports = {
+	initializeAdminCommands,
+	initializeAdminCallbacks,
+	broadcastPollToAll,
+};

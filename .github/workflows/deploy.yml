@@ -20,18 +20,18 @@ jobs:
         with:
           node-version: '20.x'
           cache: 'npm'
-          cache-dependency-path: client/package-lock.json
+          cache-dependency-path: client/cartoon-randomizer/package-lock.json
 
       - name: Install dependencies
-        working-directory: client
+        working-directory: client/cartoon-randomizer
         run: npm install
 
       - name: Build client
-        working-directory: client
+        working-directory: client/cartoon-randomizer
         run: npm run build
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: client/dist
+          publish_dir: client/cartoon-randomizer/dist

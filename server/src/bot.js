@@ -1,12 +1,13 @@
 const { Telegraf, Markup, session, Scenes } = require('telegraf');
 const sceneList = require('./telegramTools/scenes/movieSettingsScenes');
 const userProfileScenes = require('./telegramTools/scenes/userProfileScenes');
+const broadcastScene = require('./telegramTools/scenes/broadcastScene');
+const { getKeyboardForUser } = require('./telegramTools/keyboards/keyboards');
 const {
 	initializeAdminCommands,
 	initializeAdminCallbacks,
+	broadcastPollToAll,
 } = require('./telegramTools/adminCommandsConfig/commandConfig');
-const stage = new Scenes.Stage([...sceneList, ...userProfileScenes]);
-
 const {
 	TELEGRAM_BOT_TOKEN,
 	ADMIN_ID,
@@ -14,6 +15,7 @@ const {
 	LIMIT_RESET_INTERVAL_MS,
 	PAYMENT_PROVIDER_TOKEN,
 } = require('./config/config');
+
 const {
 	findOrCreateUser,
 	resetRequestLimit,
@@ -31,7 +33,42 @@ const {
 	getPosterUrl,
 } = require('./services/tmdb');
 
+const {
+	isActivePoll,
+	updatePollById,
+	incrementPollVotes,
+	deleteAllPolls,
+} = require('./services/TGPollService');
+
+const {
+	clearAllPollsFromDB,
+	clearPollMessages,
+} = require('./services/clearService');
+
+const stage = new Scenes.Stage([
+	...sceneList,
+	...userProfileScenes,
+	broadcastScene,
+]);
+
 const bot = new Telegraf(TELEGRAM_BOT_TOKEN);
+
+bot.use(async (ctx, next) => {
+	const chatId = ctx.chat?.id || ctx.from?.id;
+	const username = ctx.from?.username;
+	if (chatId) {
+		ctx.state.user = await findOrCreateUser(chatId, username);
+	}
+	console.log(
+		`🤖 ${new Date().toISOString()} User ${chatId} (${
+			username || 'no_username'
+		}) - ${ctx.message?.text || ctx.callbackQuery?.data}`,
+	);
+	await next();
+});
+
+bot.use(session());
+bot.use(stage.middleware());
 
 const paymentKeyboard = Markup.inlineKeyboard([
 	Markup.button.pay('1 мультфильм за 5 ⭐️'),
@@ -93,35 +130,6 @@ function limitUserActions({
 }
 
 // bot.use(limitUserActions());
-bot.use(async (ctx, next) => {
-	const chatId = ctx.chat?.id || ctx.from?.id;
-	const username = ctx.from?.username;
-	if (chatId) {
-		ctx.state.user = await findOrCreateUser(chatId, username);
-	}
-	console.log(
-		`🤖 ${new Date().toISOString()} User ${chatId} (${
-			username || 'no_username'
-		}) - ${ctx.message?.text || ctx.callbackQuery?.data}`,
-	);
-	await next();
-});
-
-bot.use(session());
-bot.use(stage.middleware());
-
-/**
- * Генерирует основную клавиатуру для пользователя.
- * @returns {object} - Объект разметки клавиатуры Telegraf.
- */
-function getMainKeyboard() {
-	return Markup.keyboard([
-		['🎲 Мультфильм'],
-		['ℹ️ Мой профиль', '⭐ Избранное'],
-		// ['✏️ Сменить имя', '📅 Сменить возраст'],
-		// ['🔄 Сбросить всё'],
-	]).resize();
-}
 
 /**
  * Генерирует инлайн-кнопки для мультфильма.
@@ -162,11 +170,33 @@ bot.start(async (ctx) => {
 		return;
 	}
 
+	// Just for testing purposes
+	// await deleteAllPolls();
+
 	user.step = 'done';
 	await user.save();
+
 	ctx.reply(
 		`Привет снова, ${user.name}! Готов подобрать мультфильм?`,
-		getMainKeyboard(),
+		getKeyboardForUser(ctx),
+	);
+});
+
+bot.on('poll_answer', async (ctx) => {
+	const { poll_id, option_ids, user } = ctx.update.poll_answer;
+	if (!isActivePoll(poll_id)) return;
+
+	const poll = await incrementPollVotes(poll_id, option_ids);
+	const results = poll.options
+		.map((o, i) => `${i}. ${o.text}: ${o.voteCount}`)
+		.join('\n');
+
+	await ctx.telegram.sendMessage(
+		ADMIN_ID,
+		`Пользователь ${
+			user.username || user.id
+		} проголосовал за [${option_ids.join(', ')}]\n\n` +
+			`Текущие результаты:\n${results}`,
 	);
 });
 
@@ -175,6 +205,31 @@ initializeAdminCommands(bot);
 
 bot.command('age', async (ctx) => {
 	return ctx.scene.enter('userAgeScene');
+});
+
+bot.hears('🗑️ Очистить опросы', async (ctx) => {
+	if (ctx.from.id !== ADMIN_ID) {
+		return ctx.reply(
+			'❌ Только администратор может это сделать.',
+			getKeyboardForUser(ctx),
+		);
+	}
+
+	await ctx.reply('⚙️ Удаляю все опросы…');
+	try {
+		const count = await clearPollMessages(ctx.telegram);
+		await clearAllPollsFromDB();
+		await ctx.reply(
+			`✅ Успешно удалено ${count} опрос${count === 1 ? '' : 'ов'}.`,
+			getKeyboardForUser(ctx),
+		);
+	} catch (err) {
+		console.error('Ошибка при удалении опросов:', err);
+		await ctx.reply(
+			'❌ Не удалось удалить опросы. Смотрите логи.',
+			getKeyboardForUser(ctx),
+		);
+	}
 });
 
 bot.action('change_rating', async (ctx) => {
@@ -366,6 +421,12 @@ bot.on('text', async (ctx) => {
 				await ctx.reply('Произошла ошибка при поиске мультфильма.');
 			}
 			return;
+		case '📢 Отправить сообщение всем пользователям':
+			if (user.telegramId !== ADMIN_ID) {
+				ctx.reply('Эта команда доступна только администратору.');
+				return;
+			}
+			return ctx.scene.enter('broadcast');
 		default:
 			// Обработка шагов анкетирования
 			if (user.step === 'ask_name') {
@@ -388,8 +449,26 @@ bot.on('text', async (ctx) => {
 				await user.save();
 
 				await ctx.reply(
-					`✅ Возраст успешно изменён на ${age}\n\n⬇️ Готово! Используй меню ниже:`,
-					getMainKeyboard(),
+					`Готово! Используй меню ниже:`,
+					getKeyboardForUser(ctx),
+				);
+				return;
+			}
+
+			if (user.step === 'get_notification_text') {
+				const text = ctx.message.text.trim();
+				if (!text) {
+					ctx.reply('Введите текст уведомления.');
+					return;
+				}
+
+				user.notificationText = text;
+				user.step = 'done';
+				await user.save();
+
+				await ctx.reply(
+					`Готово! Используй меню ниже:`,
+					getKeyboardForUser(ctx),
 				);
 				return;
 			}
@@ -619,6 +698,30 @@ bot.on('successful_payment', async (ctx) => {
 				],
 			]),
 		},
+	);
+});
+
+bot.on('poll_answer', async (ctx) => {
+	const { poll_id, option_ids, user } = ctx.update.poll_answer;
+
+	// Если у вас в сессии хранятся активные poll_id
+	const active = ctx.session.broadcastPollIds || [];
+	console.log('Active polls:', active);
+
+	if (!active.includes(poll_id)) {
+		return;
+	}
+
+	console.log(
+		`Пользователь ${user.username || user.id} проголосовал:`,
+		option_ids,
+	);
+
+	// TODO: сохранить в БД или сразу сообщить админу
+	// пример: оповестить администратора:
+	await ctx.telegram.sendMessage(
+		ADMIN_ID,
+		`От ${user.username || user.id}: выбраны варианты ${option_ids.join(', ')}`,
 	);
 });
 

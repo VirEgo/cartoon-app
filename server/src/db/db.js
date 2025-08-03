@@ -1,9 +1,7 @@
 const mongoose = require('mongoose');
 const { MONGO_URI } = require('../config/config');
 
-/**
- * Подключается к базе данных MongoDB.
- */
+// Подключение к MongoDB
 async function connectDB() {
 	try {
 		await mongoose.connect(MONGO_URI, {
@@ -19,5 +17,5 @@ async function connectDB() {
 
 module.exports = {
 	connectDB,
-	mongoose, // Экспортируем mongoose, если требуется доступ к моделям
+	mongoose,
 };

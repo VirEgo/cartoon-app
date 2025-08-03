@@ -19,6 +19,10 @@ async function findOrCreateUser(telegramId, username) {
 	return user;
 }
 
+async function getAllUsers() {
+	return User.find({}, 'telegramId').exec();
+}
+
 /**
  * Обновляет поле(поля) пользователя.
  * @param {number} telegramId - Telegram ID пользователя.
@@ -187,4 +191,5 @@ module.exports = {
 	resetUserData,
 	decrementUserStars,
 	updateMovieFilter,
+	getAllUsers,
 };
