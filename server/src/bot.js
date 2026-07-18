@@ -31,8 +31,8 @@ const {
 const {
 	findOrCreateUser,
 	refreshUserRequestLimit,
-	addLikedCartoon,
-	addDislikedCartoon,
+	toggleLikedCartoon,
+	toggleDislikedCartoon,
 	toggleFavoriteCartoon,
 	resetUserData,
 } = require('./services/user');
@@ -174,8 +174,8 @@ registerTextHandler(bot, {
 
 registerCallbackHandler(bot, {
 	handleAdminCallback,
-	addLikedCartoon,
-	addDislikedCartoon,
+	toggleLikedCartoon,
+	toggleDislikedCartoon,
 	toggleFavoriteCartoon,
 	resetUserData,
 	ADMIN_ID,

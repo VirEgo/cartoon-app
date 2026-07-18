@@ -108,6 +108,47 @@ async function updateMovieFilter(telegramId, filterUpdates) {
 /**
  * Получает информацию о пользователе.
  * @param {number} telegramId - Telegram ID пользователя.
+
+/**
+ * Переключает безлимитный доступ для пользователя.
+ * @param {number} telegramId - Telegram ID пользователя.
+ * @param {boolean} isUnlimited - Включить (true) или выключить (false) безлимит.
+ * @returns {Promise<User|null>} - Обновленный объект пользователя или null, если пользователь не найден.
+ */
+async function toggleUnlimitedAccess(telegramId, isUnlimited) {
+	return updateUser(telegramId, { isUnlimited });
+}
+
+/**
+ * Обновляет только фильтры поиска (movieFilter) для пользователя
+ * @param {number} telegramId - ID пользователя Telegram
+ * @param {object} filterUpdates - объект с полями из movieFilter для обновления
+ * @returns {Promise<User|null>} - обновлённый пользователь или null, если не найден
+ */
+async function updateMovieFilter(telegramId, filterUpdates) {
+	// Подготавливаем $set для вложенных полей
+	const setData = {};
+	for (const [key, value] of Object.entries(filterUpdates)) {
+		setData[`movieFilter.${key}`] = value;
+	}
+
+	const updated = await User.findOneAndUpdate(
+		{ telegramId },
+		{ $set: setData },
+		{
+			new: true,
+			runValidators: true,
+			context: 'query',
+			select: '-__v',
+		},
+	).exec();
+
+	return updated;
+}
+
+/**
+ * Получает информацию о пользователе.
+ * @param {number} telegramId - Telegram ID пользователя.
  * @returns {Promise<User|null>} - Объект пользователя или null, если пользователь не найден.
  */
 async function getUserInfo(telegramId) {
@@ -115,31 +156,81 @@ async function getUserInfo(telegramId) {
 }
 
 /**
- * Добавляет ID мультфильма в список понравившихся для пользователя.
+ * Переключает лайк мультфильма для пользователя.
  * @param {number} telegramId - Telegram ID пользователя.
  * @param {number} cartoonId - ID мультфильма.
- * @returns {Promise<User|null>} - Обновленный объект пользователя или null, если пользователь не найден.
+ * @returns {Promise<{user: User|null, added: boolean}>}
  */
-async function addLikedCartoon(telegramId, cartoonId) {
-	return User.findOneAndUpdate(
-		{ telegramId, likedCartoonIds: { $ne: cartoonId } },
-		{ $push: { likedCartoonIds: cartoonId, seenCartoonIds: cartoonId } },
-		{ new: true },
-	);
+async function toggleLikedCartoon(telegramId, cartoonId) {
+	const user = await User.findOne({ telegramId });
+	if (!user) return { user: null, added: false };
+
+	if (!user.likedCartoonIds) user.likedCartoonIds = [];
+	if (!user.dislikedCartoonIds) user.dislikedCartoonIds = [];
+	if (!user.seenCartoonIds) user.seenCartoonIds = [];
+
+	const index = user.likedCartoonIds.indexOf(cartoonId);
+	let added = false;
+
+	if (index > -1) {
+		user.likedCartoonIds.splice(index, 1);
+	} else {
+		user.likedCartoonIds.push(cartoonId);
+		added = true;
+
+		// Remove from disliked if present
+		const dislikedIndex = user.dislikedCartoonIds.indexOf(cartoonId);
+		if (dislikedIndex > -1) {
+			user.dislikedCartoonIds.splice(dislikedIndex, 1);
+		}
+
+		// Ensure it is in seen
+		if (!user.seenCartoonIds.includes(cartoonId)) {
+			user.seenCartoonIds.push(cartoonId);
+		}
+	}
+
+	await user.save();
+	return { user, added };
 }
 
 /**
- * Добавляет ID мультфильма в список не понравившихся для пользователя.
+ * Переключает дизлайк мультфильма для пользователя.
  * @param {number} telegramId - Telegram ID пользователя.
  * @param {number} cartoonId - ID мультфильма.
- * @returns {Promise<User|null>} - Обновленный объект пользователя или null, если пользователь не найден.
+ * @returns {Promise<{user: User|null, added: boolean}>}
  */
-async function addDislikedCartoon(telegramId, cartoonId) {
-	return User.findOneAndUpdate(
-		{ telegramId, dislikedCartoonIds: { $ne: cartoonId } },
-		{ $push: { dislikedCartoonIds: cartoonId, seenCartoonIds: cartoonId } },
-		{ new: true },
-	);
+async function toggleDislikedCartoon(telegramId, cartoonId) {
+	const user = await User.findOne({ telegramId });
+	if (!user) return { user: null, added: false };
+
+	if (!user.likedCartoonIds) user.likedCartoonIds = [];
+	if (!user.dislikedCartoonIds) user.dislikedCartoonIds = [];
+	if (!user.seenCartoonIds) user.seenCartoonIds = [];
+
+	const index = user.dislikedCartoonIds.indexOf(cartoonId);
+	let added = false;
+
+	if (index > -1) {
+		user.dislikedCartoonIds.splice(index, 1);
+	} else {
+		user.dislikedCartoonIds.push(cartoonId);
+		added = true;
+
+		// Remove from liked if present
+		const likedIndex = user.likedCartoonIds.indexOf(cartoonId);
+		if (likedIndex > -1) {
+			user.likedCartoonIds.splice(likedIndex, 1);
+		}
+
+		// Ensure it is in seen
+		if (!user.seenCartoonIds.includes(cartoonId)) {
+			user.seenCartoonIds.push(cartoonId);
+		}
+	}
+
+	await user.save();
+	return { user, added };
 }
 
 /**
@@ -212,8 +303,8 @@ module.exports = {
 	refreshUserRequestLimit,
 	toggleUnlimitedAccess,
 	getUserInfo,
-	addLikedCartoon,
-	addDislikedCartoon,
+	toggleLikedCartoon,
+	toggleDislikedCartoon,
 	toggleFavoriteCartoon,
 	resetUserData,
 	decrementUserStars,

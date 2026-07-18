@@ -9,16 +9,18 @@ function generateCartoonButtons(user, cartoon) {
 	const alreadyInFav = user.favoriteCartoonIds?.includes(cartoon.id);
 	const alreadyDisliked = user.dislikedCartoonIds?.includes(cartoon.id);
 
-	const likeButton = alreadyLiked
-		? Markup.button.callback('Уже нравится', 'already_liked')
-		: Markup.button.callback('Нравится', `like_${cartoon.id}`);
+	const likeButton = Markup.button.callback(
+		alreadyLiked ? '❤️ Нравится' : '👍 Нравится',
+		`like_${cartoon.id}`
+	);
 
-	const dislikeButton = alreadyDisliked
-		? Markup.button.callback('Убрать дизлайк', 'already_disliked')
-		: Markup.button.callback('Не нравится', `dislike_${cartoon.id}`);
+	const dislikeButton = Markup.button.callback(
+		alreadyDisliked ? '🖤 Не нравится' : '👎 Не нравится',
+		`dislike_${cartoon.id}`
+	);
 
 	const favButton = Markup.button.callback(
-		alreadyInFav ? 'Убрать из избранного' : 'В избранное',
+		alreadyInFav ? '🌟 В избранном' : '⭐ В избранное',
 		`togglefav_${cartoon.id}`,
 	);
 

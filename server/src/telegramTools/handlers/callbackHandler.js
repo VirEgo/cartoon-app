@@ -9,8 +9,8 @@ function registerCallbackHandler(
 	bot,
 	{
 		handleAdminCallback,
-		addLikedCartoon,
-		addDislikedCartoon,
+		toggleLikedCartoon,
+		toggleDislikedCartoon,
 		toggleFavoriteCartoon,
 		resetUserData,
 		ADMIN_ID,
@@ -71,13 +71,17 @@ function registerCallbackHandler(
 				return ctx.reply('Некорректный ID мультфильма.');
 			}
 
-			const updatedUser = await addLikedCartoon(user.telegramId, id);
+			const { user: updatedUser, added } = await toggleLikedCartoon(user.telegramId, id);
 			if (updatedUser) {
 				try {
 					await ctx.editMessageReplyMarkup(
 						generateCartoonButtons(updatedUser, { id }),
 					);
-					await ctx.answerCbQuery('Добавлено в избранное ❤️');
+					if (added) {
+						await ctx.answerCbQuery('Добавлено в понравившиеся ❤️');
+					} else {
+						await ctx.answerCbQuery('Убрано из понравившихся 💔');
+					}
 				} catch (error) {
 					console.warn(
 						'Не удалось обновить кнопки после лайка:',
@@ -85,7 +89,7 @@ function registerCallbackHandler(
 					);
 				}
 			} else {
-				await ctx.reply('Уже нравится!');
+				await ctx.reply('Произошла ошибка.');
 			}
 			return;
 		}
@@ -96,12 +100,17 @@ function registerCallbackHandler(
 				return ctx.reply('Некорректный ID мультфильма.');
 			}
 
-			const updatedUser = await addDislikedCartoon(user.telegramId, id);
+			const { user: updatedUser, added } = await toggleDislikedCartoon(user.telegramId, id);
 			if (updatedUser) {
 				try {
 					await ctx.editMessageReplyMarkup(
 						generateCartoonButtons(updatedUser, { id }),
 					);
+					if (added) {
+						await ctx.answerCbQuery('Отмечено как неинтересное 👎');
+					} else {
+						await ctx.answerCbQuery('Убрано из неинтересных');
+					}
 				} catch (error) {
 					console.warn(
 						'⚠️ Не удалось обновить кнопки после дизлайка:',
@@ -109,7 +118,7 @@ function registerCallbackHandler(
 					);
 				}
 			} else {
-				await ctx.reply('Уже отмечен как неинтересный.');
+				await ctx.reply('Произошла ошибка.');
 			}
 			return;
 		}
@@ -150,16 +159,7 @@ function registerCallbackHandler(
 		}
 
 		switch (data) {
-			case 'already_liked':
-				await ctx.answerCbQuery('Фильм уже в избранном ❤️', {
-					show_alert: true,
-				});
-				return;
-			case 'already_disliked':
-				await ctx.answerCbQuery('Фильм уже в черном списке 👎', {
-					show_alert: true,
-				});
-				return;
+
 			case 'check_limit': {
 				if (user.requestCount < REQUEST_LIMIT) {
 					await ctx.editMessageText(
