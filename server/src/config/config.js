@@ -23,16 +23,16 @@ if (!PAYMENT_PROVIDER_TOKEN) {
 
 // Проверка наличия необходимых переменных окружения
 if (!TELEGRAM_BOT_TOKEN) {
-	throw new Error('Переменная окружения TELEGRAM_BOT_TOKEN не установлена.');
+	console.error('Ошибка: Переменная окружения TELEGRAM_BOT_TOKEN не установлена.');
 }
 if (!MONGO_URI) {
-	throw new Error('Переменная окружения MONGO_URI не установлена.');
+	console.error('Ошибка: Переменная окружения MONGO_URI не установлена.');
 }
 if (!TMDB_API_KEY) {
-	throw new Error('Переменная окружения TMDB_API_KEY не установлена.');
+	console.error('Ошибка: Переменная окружения TMDB_API_KEY не установлена.');
 }
 if (!JWT_SECRET) {
-	throw new Error('Переменная окружения JWT_SECRET не установлена.');
+	console.error('Ошибка: Переменная окружения JWT_SECRET не установлена.');
 }
 if (isNaN(ADMIN_ID)) {
 	console.warn(
