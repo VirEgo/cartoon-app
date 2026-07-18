@@ -1,4 +1,4 @@
-const { ADMIN_ID } = require('../../config/config');
+const { ADMIN_ID, REQUEST_LIMIT } = require('../../config/config');
 const {
 	getAllUsers,
 	resetRequestLimit,
@@ -8,11 +8,10 @@ const {
 const { createPoll, addActivePolls } = require('../../services/TGPollService');
 
 function initializeAdminCommands(botEntity) {
-	const ctx = botEntity.context;
-	if (ctx?.from?.id !== ADMIN_ID) return;
-	console.log(ctx, 'Admin commands initialized for', ctx.from.id);
-
 	botEntity.command('approve', async (ctx) => {
+		if (ctx.from?.id !== ADMIN_ID) {
+			return ctx.reply('У вас нет прав для выполнения этой команды.');
+		}
 		const args = ctx.message.text.split(' ');
 		const targetId = parseInt(args[1]);
 		if (isNaN(targetId))
@@ -29,6 +28,9 @@ function initializeAdminCommands(botEntity) {
 	});
 
 	botEntity.command('unlimit', async (ctx) => {
+		if (ctx.from?.id !== ADMIN_ID) {
+			return ctx.reply('У вас нет прав для выполнения этой команды.');
+		}
 		const args = ctx.message.text.split(' ');
 		const targetId = parseInt(args[1]);
 		if (isNaN(targetId))
@@ -45,6 +47,9 @@ function initializeAdminCommands(botEntity) {
 	});
 
 	botEntity.command('limit', async (ctx) => {
+		if (ctx.from?.id !== ADMIN_ID) {
+			return ctx.reply('У вас нет прав для выполнения этой команды.');
+		}
 		const args = ctx.message.text.split(' ');
 		const targetId = parseInt(args[1]);
 		if (isNaN(targetId))
@@ -58,6 +63,9 @@ function initializeAdminCommands(botEntity) {
 	});
 
 	botEntity.command('get', async (ctx) => {
+		if (ctx.from?.id !== ADMIN_ID) {
+			return ctx.reply('У вас нет прав для выполнения этой команды.');
+		}
 		const args = ctx.message.text.split(' ');
 		const targetId = parseInt(args[1]);
 		if (isNaN(targetId))
@@ -82,17 +90,17 @@ function initializeAdminCommands(botEntity) {
  * @param {string[]} options — варианты ответа
  * @returns {Promise<string[]>} — массив отправленных poll_id
  */
-async function broadcastPollToAll(telegram, question, options) {
+async function broadcastPollToAll(telegram, question, options, extra = {}) {
 	const users = await getAllUsers();
-	const testUsers = [{ telegramId: 129600319 }, { telegramId: 6121961198 }];
 	const pollIds = [];
 
-	for (const { telegramId: chatId } of testUsers) {
+	for (const { telegramId: chatId } of users) {
 		if (!chatId) continue;
 		try {
 			const sent = await telegram.sendPoll(chatId, question, options, {
 				is_anonymous: false,
 				open_period: 10 * 60,
+				...extra,
 			});
 			pollIds.push(sent.poll.id);
 			await createPoll({
@@ -114,80 +122,110 @@ async function broadcastPollToAll(telegram, question, options) {
 	}
 
 	// сохраняем все poll_id для последующей фильтрации
-	addActivePolls(pollIds);
+	await addActivePolls(pollIds);
 	return pollIds;
 }
 
-async function initializeAdminCallbacks(bot) {
-	const ctx = bot.context;
-	if (!ctx || ctx?.from?.id !== ADMIN_ID) return;
-	const data = ctx.callbackQuery.data;
+async function broadcastMessageToAll(telegram, text, extra = {}) {
+	const users = await getAllUsers();
+	let sentCount = 0;
+	let failedCount = 0;
 
-	// Обработка callback query для админа
-	if (data.startsWith('admin_')) {
-		if (!ctx || ctx?.from?.id !== ADMIN_ID) {
-			return ctx.reply('У вас нет прав для выполнения этой команды.');
-		}
-
-		const [_, action, targetIdStr] = data.split('_');
-		const targetId = parseInt(targetIdStr);
-		if (isNaN(targetId))
-			return ctx.reply('Некорректный Telegram ID пользователя.');
-
-		const targetUser = await getUserInfo(targetId);
-		if (!targetUser) return ctx.reply('Пользователь не найден.');
+	for (const { telegramId: chatId } of users) {
+		if (!chatId) continue;
 
 		try {
-			switch (action) {
-				case 'approve':
-					await resetRequestLimit(targetId);
-					await ctx.editMessageText(`Лимит сброшен для ${targetId}`);
-					await ctx.telegram.sendMessage(
-						targetId,
-						'🎉 Администратор обновил твой лимит. Приятного просмотра!',
-					);
-					break;
-				case 'unlimit':
-					await toggleUnlimitedAccess(targetId, true);
-					await ctx.reply(`Безлимит включен для ${targetId}`);
-					await ctx.telegram.sendMessage(
-						targetId,
-						'✨ Администратор дал тебе безлимитный доступ!',
-					);
-					break;
-				case 'limit':
-					await toggleUnlimitedAccess(targetId, false);
-					await ctx.reply(`Безлимит отключён для ${targetId}`);
-					await ctx.telegram.sendMessage(
-						targetId,
-						'Безлимитный доступ отключён.',
-					);
-					break;
-				case 'get':
-					await ctx.reply(
-						`👤 Пользователь @${
-							targetUser.username || 'неизвестно'
-						} (${targetId})\n` +
-							`Имя: ${targetUser.name || '-'}\nВозраст: ${
-								targetUser.age || '-'
-							}\n` +
-							`Запросов: ${targetUser.requestCount}/${REQUEST_LIMIT}\n` +
-							`Безлимит: ${targetUser.isUnlimited ? 'Да' : 'Нет'}`,
-					);
-					break;
-				default:
-					ctx.reply('Неизвестная админская команда.');
-			}
+			await telegram.sendMessage(chatId, text, extra);
+			sentCount++;
 		} catch (error) {
-			console.error('Ошибка в админской команде:', error);
-			ctx.reply('Произошла ошибка при выполнении админской команды.');
+			failedCount++;
+			console.error(
+				`Не удалось отправить сообщение пользователю ${chatId}:`,
+				error,
+			);
 		}
-		return;
+
+		await new Promise((resolve) => setTimeout(resolve, 34));
 	}
+
+	return { sentCount, failedCount };
+}
+
+async function handleAdminCallback(ctx) {
+	const data = ctx.callbackQuery?.data;
+	if (!data?.startsWith('admin_')) {
+		return false;
+	}
+
+	if (ctx.from?.id !== ADMIN_ID) {
+		await ctx.answerCbQuery('У вас нет прав для выполнения этой команды.', {
+			show_alert: true,
+		});
+		return true;
+	}
+
+	const [_, action, targetIdStr] = data.split('_');
+	const targetId = parseInt(targetIdStr);
+	if (isNaN(targetId)) {
+		await ctx.reply('Некорректный Telegram ID пользователя.');
+		return true;
+	}
+
+	const targetUser = await getUserInfo(targetId);
+	if (!targetUser) {
+		await ctx.reply('Пользователь не найден.');
+		return true;
+	}
+
+	try {
+		switch (action) {
+			case 'approve':
+				await resetRequestLimit(targetId);
+				await ctx.editMessageText(`Лимит сброшен для ${targetId}`);
+				await ctx.telegram.sendMessage(
+					targetId,
+					'🎉 Администратор обновил твой лимит. Приятного просмотра!',
+				);
+				break;
+			case 'unlimit':
+				await toggleUnlimitedAccess(targetId, true);
+				await ctx.reply(`Безлимит включен для ${targetId}`);
+				await ctx.telegram.sendMessage(
+					targetId,
+					'✨ Администратор дал тебе безлимитный доступ!',
+				);
+				break;
+			case 'limit':
+				await toggleUnlimitedAccess(targetId, false);
+				await ctx.reply(`Безлимит отключён для ${targetId}`);
+				await ctx.telegram.sendMessage(targetId, 'Безлимитный доступ отключён.');
+				break;
+			case 'get':
+				await ctx.reply(
+					`👤 Пользователь @${
+						targetUser.username || 'неизвестно'
+					} (${targetId})\n` +
+						`Имя: ${targetUser.name || '-'}\nВозраст: ${
+							targetUser.age || '-'
+						}\n` +
+						`Запросов: ${targetUser.requestCount}/${REQUEST_LIMIT}\n` +
+						`Безлимит: ${targetUser.isUnlimited ? 'Да' : 'Нет'}`,
+				);
+				break;
+			default:
+				await ctx.reply('Неизвестная админская команда.');
+		}
+		await ctx.answerCbQuery();
+	} catch (error) {
+		console.error('Ошибка в админской команде:', error);
+		await ctx.reply('Произошла ошибка при выполнении админской команды.');
+	}
+	return true;
 }
 
 module.exports = {
 	initializeAdminCommands,
-	initializeAdminCallbacks,
+	handleAdminCallback,
 	broadcastPollToAll,
+	broadcastMessageToAll,
 };

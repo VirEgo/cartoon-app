@@ -8,6 +8,8 @@ const PollSchema = new mongoose.Schema({
 	options: [{ text: String, voteCount: { type: Number, default: 0 } }],
 	isAnonymous: { type: Boolean, default: false },
 	openPeriod: { type: Number, default: 600 },
+	isActive: { type: Boolean, default: true, index: true },
+	closedAt: { type: Date, default: null },
 	createdAt: { type: Date, default: Date.now },
 });
 

@@ -7,6 +7,7 @@ const TMDB_API_KEY = process.env.TMDB_API_KEY;
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const MONGO_URI = process.env.MONGO_URI;
 const PAYMENT_PROVIDER_TOKEN = process.env.PAYMENT_PROVIDER_TOKEN || null;
+const JWT_SECRET = process.env.JWT_SECRET;
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
 const CARTOON_GENRE_ID = 16; // ID жанра "Мультфильм" на TMDB
@@ -35,6 +36,10 @@ if (!TMDB_API_KEY) {
 	console.error('Ошибка: Переменная окружения TMDB_API_KEY не установлена.');
 	process.exit(1);
 }
+if (!JWT_SECRET) {
+	console.error('Ошибка: Переменная окружения JWT_SECRET не установлена.');
+	process.exit(1);
+}
 if (isNaN(ADMIN_ID)) {
 	console.warn(
 		'Предупреждение: Переменная окружения ADMIN_ID не установлена или некорректна. Админ-команды будут недоступны.',
@@ -56,4 +61,5 @@ module.exports = {
 	EXCLUDE_ORIGINAL_LANGUAGES,
 	DEFAULT_CERTIFICATION_COUNTRIES,
 	PAYMENT_PROVIDER_TOKEN,
+	JWT_SECRET,
 };

@@ -39,23 +39,29 @@ async function deleteAllPolls() {
 	return deleted;
 }
 
-const activePolls = new Set();
-
 /**
- * Добавить список poll_id'ов в «активные»
+ * Пометить список poll_id'ов как активные в БД.
  * @param {string[]} ids
  */
-function addActivePolls(ids) {
-	ids.forEach((id) => activePolls.add(id));
+async function addActivePolls(ids) {
+	if (!Array.isArray(ids) || ids.length === 0) {
+		return;
+	}
+
+	await Poll.updateMany(
+		{ pollId: { $in: ids } },
+		{ $set: { isActive: true, closedAt: null } },
+	);
 }
 
 /**
- * Проверить, является ли poll_id активным
+ * Проверить, является ли poll_id активным.
  * @param {string} id
- * @returns {boolean}
+ * @returns {Promise<boolean>}
  */
-function isActivePoll(id) {
-	return activePolls.has(id);
+async function isActivePoll(id) {
+	const poll = await Poll.exists({ pollId: id, isActive: true });
+	return Boolean(poll);
 }
 
 /**

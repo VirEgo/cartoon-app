@@ -43,6 +43,32 @@ async function resetRequestLimit(telegramId) {
 }
 
 /**
+ * Обновляет лимит пользователя, если окно лимита уже истекло.
+ * @param {import('../models/User')} user
+ * @param {number} limitResetIntervalMs
+ * @returns {Promise<{user: any, didReset: boolean}>}
+ */
+async function refreshUserRequestLimit(user, limitResetIntervalMs) {
+	if (!user || user.isUnlimited) {
+		return { user, didReset: false };
+	}
+
+	const lastResetAt = user.lastResetAt ? new Date(user.lastResetAt) : new Date(0);
+	const now = new Date();
+	const timeSinceLastReset = now - lastResetAt;
+
+	if (timeSinceLastReset < limitResetIntervalMs) {
+		return { user, didReset: false };
+	}
+
+	user.requestCount = 0;
+	user.lastResetAt = now;
+	await user.save();
+
+	return { user, didReset: true };
+}
+
+/**
  * Переключает безлимитный доступ для пользователя.
  * @param {number} telegramId - Telegram ID пользователя.
  * @param {boolean} isUnlimited - Включить (true) или выключить (false) безлимит.
@@ -183,6 +209,7 @@ module.exports = {
 	findOrCreateUser,
 	updateUser,
 	resetRequestLimit,
+	refreshUserRequestLimit,
 	toggleUnlimitedAccess,
 	getUserInfo,
 	addLikedCartoon,

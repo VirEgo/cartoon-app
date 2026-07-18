@@ -44,6 +44,24 @@ if (bot) {
 	app.use(bot.webhookCallback('/webhook'));
 }
 
+// Auth routes
+const authRoutes = require('./src/routes/auth');
+if (bot) {
+	authRoutes.setBotInstance(bot);
+} else {
+	console.warn('Bot не инициализирован! authRoutes не получит bot');
+}
+app.use('/api/auth', authRoutes);
+
+// User routes
+const userRoutes = require('./src/routes/user');
+app.use('/api/user', userRoutes);
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+	res.json({ status: 'Server is running', timestamp: new Date() });
+});
+
 // API endpoint for image cartoonization
 app.post('/api/cartoonize', upload.single('image'), async (req, res) => {
 	try {
@@ -90,24 +108,48 @@ async function start() {
 		await connectDB();
 	}
 
-	// Запускаем бота в зависимости от окружения (webhook или polling)
+	// Запускаем Express сервер первым
+	app.listen(PORT, () => {
+		console.log(`🌐 Express listening on port ${PORT}`);
+	});
+
+	// Запускаем бота в зависимости от окружения (webhook или polling) БЕЗ await
 	if (bot) {
 		if (process.env.RENDER_EXTERNAL_URL) {
 			// Рендер: запускаем в режиме Webhook
 			const webhookUrl = `${process.env.RENDER_EXTERNAL_URL}/webhook`;
-			await bot.telegram.setWebhook(webhookUrl);
-			console.log('✅ Webhook установлен:', webhookUrl);
+			bot.telegram
+				.setWebhook(webhookUrl)
+				.then(() => {
+					console.log('Webhook установлен:', webhookUrl);
+				})
+				.catch((err) => {
+					console.error('Ошибка установки webhook:', err);
+				});
 		} else {
-			// Локальная разработка: включаем polling
-			await bot.launch();
-			console.log('🚀 Bot запущен в режиме polling');
+			// Локальная разработка: включаем polling в фоне
+			bot.launch()
+				.then(() => {
+					console.log('Bot запущен в режиме polling');
+				})
+				.catch((err) => {
+					console.error('Ошибка запуска бота:', err);
+				});
 		}
 	}
 
-	// Запускаем Express сервер
-	app.listen(PORT, () => {
-		console.log(`🌐 Express listening on port ${PORT}`);
-	});
+	// Механизм анти-сна для Render (пингует сервер каждые 50 секунд)
+	if (process.env.RENDER_EXTERNAL_URL) {
+		const pingInterval = 50 * 1000; // 50 секунд
+		const url = `${process.env.RENDER_EXTERNAL_URL}/api/health`;
+		console.log(`[Anti-sleep] Настроен пинг сервера ${url} каждые 50 секунд`);
+		
+		setInterval(() => {
+			require('axios').get(url)
+				.then(() => console.log(`[Anti-sleep] Ping успешный: ${url}`))
+				.catch(err => console.error(`[Anti-sleep] Ошибка пинга:`, err.message));
+		}, pingInterval);
+	}
 }
 
 start();

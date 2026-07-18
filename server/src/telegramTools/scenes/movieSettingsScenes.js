@@ -40,10 +40,22 @@ languageScene.enter((ctx) =>
 	ctx.reply('Введите языки для исключения через запятую:'),
 );
 languageScene.on('text', async (ctx) => {
-	const langs = ctx.message.text.split(',').map((s) => s.trim());
-	ctx.state.user.excludedLanguages = langs;
-	await ctx.state.user.save();
-	await ctx.reply(`Исключенные языки обновлены: ${langs.join(', ')}`);
+	const langs = ctx.message.text
+		.split(',')
+		.map((s) => s.trim().toLowerCase())
+		.filter(Boolean);
+	if (!langs.length) {
+		return ctx.reply('Введите хотя бы один код языка через запятую.');
+	}
+
+	const updated = await updateMovieFilter(ctx.from.id, {
+		excludeOriginalLanguages: langs,
+	});
+	await ctx.reply(
+		`Исключенные языки обновлены: ${updated.movieFilter.excludeOriginalLanguages.join(
+			', ',
+		)}`,
+	);
 	return ctx.scene.leave();
 });
 
@@ -52,10 +64,22 @@ countriesScene.enter((ctx) =>
 	ctx.reply('Введите страны для фильтрации через запятую:'),
 );
 countriesScene.on('text', async (ctx) => {
-	const countries = ctx.message.text.split(',').map((s) => s.trim());
-	ctx.state.user.certificationCountries = countries;
-	await ctx.state.user.save();
-	await ctx.reply(`Страны сертификации обновлены: ${countries.join(', ')}`);
+	const countries = ctx.message.text
+		.split(',')
+		.map((s) => s.trim().toUpperCase())
+		.filter(Boolean);
+	if (!countries.length) {
+		return ctx.reply('Введите хотя бы один код страны через запятую.');
+	}
+
+	const updated = await updateMovieFilter(ctx.from.id, {
+		certificationCountries: countries,
+	});
+	await ctx.reply(
+		`Страны сертификации обновлены: ${updated.movieFilter.certificationCountries.join(
+			', ',
+		)}`,
+	);
 	return ctx.scene.leave();
 });
 
