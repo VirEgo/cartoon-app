@@ -105,7 +105,12 @@ app.use((error, req, res, next) => {
 async function start() {
 	// Подключаемся к базе данных только если доступно
 	if (connectDB) {
-		await connectDB();
+		try {
+			await connectDB();
+		} catch (dbError) {
+			console.error('Не удалось подключиться к базе данных. Бот не будет запущен.', dbError.message);
+			bot = null; // Отключаем бота, если нет БД
+		}
 	}
 
 	// Запускаем Express сервер первым

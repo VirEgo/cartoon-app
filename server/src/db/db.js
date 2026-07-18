@@ -10,8 +10,8 @@ async function connectDB() {
 		console.log('✅ Подключено к MongoDB');
 	} catch (err) {
 		console.error('❌ Ошибка подключения к MongoDB:', err);
-		// Можно добавить более продвинутую обработку ошибок или выход из приложения
-		process.exit(1);
+		// Пробрасываем ошибку дальше, чтобы index.js мог её поймать и не "убить" весь сервер
+		throw err;
 	}
 }
 
